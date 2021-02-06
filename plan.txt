@@ -1,0 +1,10 @@
+character
+maps
+fov
+GUI
+pathfinding
+monsters
+combat
+items
+shops
+saving

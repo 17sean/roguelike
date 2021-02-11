@@ -7,6 +7,12 @@ type
         next: ^map;
     end;
 
+    pfloor = ^floor;
+    floor = record
+        x, y: integer;
+        next: ^floor;
+    end;
+
     character = record
         s: char;    { Symbol }
         x, y: integer;
@@ -15,15 +21,19 @@ type
     end;
 
 { MAP }
-procedure parseM(var first: pmap);
+procedure parseM(var first: pmap; var flr: pfloor);
 var
     mfile: text;
     last: pmap;
+    tmpflr: pfloor;
+    x, y: integer;
 begin
     if not DFE('map.txt') then
         halt(1);
 
+    y := 1;
     first := nil;
+    flr := nil;
     assign(mfile, 'map.txt');
     reset(mfile);
     while not EOF(mfile) do
@@ -39,7 +49,21 @@ begin
             last := last^.next;
         end;
         readln(mfile, last^.data);
+        x := 1;
+        while last^.data[x] <> #0 do    { Check for floors }
+        begin
+            if last^.data[x] in ['#', '.', '+'] then
+            begin
+                new(tmpflr);
+                tmpflr^.next := flr;
+                tmpflr^.x := x;
+                tmpflr^.y := y;
+                flr := tmpflr;
+            end;
+            x += 1;
+        end;
         last^.next := nil;
+        y += 1;
     end;
     close(mfile);
 end;
@@ -57,6 +81,20 @@ begin
         y += 1;
     end;
 end;
+
+function isXYfree(flr: pfloor; x, y: integer): boolean;
+begin
+    while flr <> nil do
+    begin
+        if (flr^.x = x) and (flr^.y = y) then
+        begin
+            isXYfree := true;
+            exit;
+        end;
+        flr := flr^.next;
+    end;
+    isXYfree := false;
+end;
 { /MAP }
 
 { Character }
@@ -72,26 +110,30 @@ begin
     write('.');
 end;
 
-procedure moveC(var c: character);
+procedure moveC(flr: pfloor; var c: character);
 var
     ch: char;
 begin
     hideC(c);
     ch := ReadKey;
     case ch of
-    'w': c.y -= 1;
-    'a': c.x -= 1;
-    's': c.y += 1;
-    'd': c.x += 1;
-    #27: halt;
+        'w': if isXYfree(flr, c.x, c.y-1) then c.y -= 1;
+        'a': if isXYfree(flr, c.x-1, c.y) then c.x -= 1;
+        's': if isXYfree(flr, c.x, c.y+1) then c.y += 1;
+        'd': if isXYfree(flr, c.x+1, c.y) then c.x += 1;
+        #27:
+        begin 
+            clrscr;
+            halt;
+        end;
     end;
     showC(c);
 end;
 { /Character }
 
-procedure init(var m: pmap; var c: character);
+procedure init(var m: pmap; var flr: pfloor; var c: character);
 begin
-    parseM(m);
+    parseM(m, flr);
     c.s := '@';
     c.x := 35;
     c.y := 6;
@@ -99,15 +141,16 @@ end;
 
 var
     m: pmap;
+    flr: pfloor;
     c: character;
 begin
     clrscr;
-    init(m, c);
+    init(m, flr, c);
     showM(m);
     while true do
     begin
         if KeyPressed then
-            moveC(c);
+            moveC(flr, c);
         delay(50);
     end;
 end.

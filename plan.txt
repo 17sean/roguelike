@@ -1,6 +1,5 @@
-character
-maps
-fov
+character > use spawnpoint, use money, hp, make inventory, rightly steps
+maps > make fov
 GUI
 pathfinding
 monsters

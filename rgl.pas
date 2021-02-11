@@ -1,24 +1,65 @@
 program rglike;
-uses crt;
+uses crt, slib;
 type
+    pmap = ^map;
+    map = record
+        data: string;
+        next: ^map;
+    end;
 
     character = record
         s: char;    { Symbol }
         x, y: integer;
-{
-        hp: integer;        TODO MAYBE 
-        mana: integer;
+        hp: integer;
         money: integer;
-}
     end;
 
-procedure init(var c: character);
+{ MAP }
+procedure parseM(var first: pmap);
+var
+    mfile: text;
+    last: pmap;
 begin
-    c.s := '@';
-    c.x := 5;
-    c.y := 3;
+    if not DFE('map.txt') then
+        halt(1);
+
+    first := nil;
+    assign(mfile, 'map.txt');
+    reset(mfile);
+    while not EOF(mfile) do
+    begin
+        if first = nil then
+        begin
+            new(first);
+            last := first;
+        end
+        else
+        begin
+            new(last^.next);
+            last := last^.next;
+        end;
+        readln(mfile, last^.data);
+        last^.next := nil;
+    end;
+    close(mfile);
 end;
 
+procedure showM(m: pmap);
+var
+    y: integer;
+begin
+    y := 1;
+    while m <> nil do
+    begin
+        GotoXY(1, y);
+        write(m^.data);
+        m := m^.next;
+        y += 1;
+    end;
+end;
+{ /MAP }
+
+{ Character }
 procedure showC(c: character);
 begin
     GotoXY(c.x, c.y);
@@ -28,7 +69,7 @@ end;
 procedure hideC(c: character);
 begin
     GotoXY(c.x, c.y);
-    write(' ');
+    write('.');
 end;
 
 procedure moveC(var c: character);
@@ -46,12 +87,23 @@ begin
     end;
     showC(c);
 end;
+{ /Character }
+
+procedure init(var m: pmap; var c: character);
+begin
+    parseM(m);
+    c.s := '@';
+    c.x := 35;
+    c.y := 6;
+end;
 
 var
+    m: pmap;
     c: character;
 begin
     clrscr;
-    init(c);
+    init(m, c);
+    showM(m);
     while true do
     begin
         if KeyPressed then

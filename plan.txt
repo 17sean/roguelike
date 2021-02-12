@@ -1,6 +1,6 @@
-character > use spawnpoint, use money, hp, make inventory, rightly steps
+character > use money, hp, make inventory, rightly steps
 maps > make fov
-GUI
+GUI > scan screen 80x24 -> one line at the top for hp, 2 lns for what happened
 pathfinding
 monsters
 combat

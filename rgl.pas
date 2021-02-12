@@ -20,8 +20,21 @@ type
         money: integer;
     end;
 
+procedure ScreenCheck();
+begin
+    if (ScreenHeight < 20) or (Screenwidth < 75) then
+    begin
+        clrscr;
+        GotoXY((ScreenWidth div 2) - 15, ScreenHeight div 2);
+        write('resize to 80x24');
+        delay(2000);
+        clrscr;
+        halt(1);
+    end;
+end;
+
 { MAP }
-procedure parseM(var first: pmap; var flr: pfloor);
+procedure parseM(var first: pmap; var flr: pfloor; var c: character);
 var
     mfile: text;
     last: pmap;
@@ -51,7 +64,7 @@ begin
         readln(mfile, last^.data);
         x := 1;
         while last^.data[x] <> #0 do    { Check for floors }
-        begin
+        begin { todo composite into case }
             if last^.data[x] in ['#', '.', '+'] then
             begin
                 new(tmpflr);
@@ -59,6 +72,11 @@ begin
                 tmpflr^.x := x;
                 tmpflr^.y := y;
                 flr := tmpflr;
+            end;
+            if last^.data[x] = '@' then
+            begin
+                c.x := x;
+                c.y := y;
             end;
             x += 1;
         end;
@@ -133,10 +151,8 @@ end;
 
 procedure init(var m: pmap; var flr: pfloor; var c: character);
 begin
-    parseM(m, flr);
+    parseM(m, flr, c);
     c.s := '@';
-    c.x := 35;
-    c.y := 6;
 end;
 
 var
@@ -144,6 +160,7 @@ var
     flr: pfloor;
     c: character;
 begin
+    ScreenCheck();
     clrscr;
     init(m, flr, c);
     showM(m);

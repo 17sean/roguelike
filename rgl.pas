@@ -7,10 +7,28 @@ type
         next: ^map;
     end;
 
-    pfloor = ^floor;
-    floor = record
+    ppath = ^path;
+    path = record
         x, y: integer;
-        next: ^floor;
+        next: ^path;
+    end;
+
+    pground = ^ground;
+    ground = record
+        x, y: integer;
+        next: ^ground;
+    end;
+
+    pdoor = ^door;
+    door = record
+        x, y: integer;
+        next: ^door;
+    end;
+
+    floor = record
+        p: ppath;
+        g: pground;
+        d: pdoor;
     end;
 
     character = record
@@ -20,7 +38,7 @@ type
         money: integer;
     end;
 
-procedure ScreenCheck();
+procedure screenCheck();
 begin
     if (ScreenHeight < 20) or (Screenwidth < 75) then
     begin
@@ -34,11 +52,13 @@ begin
 end;
 
 { MAP }
-procedure parseM(var first: pmap; var flr: pfloor; var c: character);
+procedure parseM(var first: pmap; var flr: floor; var c: character);
 var
     mfile: text;
     last: pmap;
-    tmpflr: pfloor;
+    pth, tpth: ppath;
+    grn, tgrn: pground;
+    dr, tdr: pdoor;
     x, y: integer;
 begin
     if not DFE('map.txt') then
@@ -46,7 +66,9 @@ begin
 
     y := 1;
     first := nil;
-    flr := nil;
+    pth := nil;
+    grn := nil;
+    dr := nil;
     assign(mfile, 'map.txt');
     reset(mfile);
     while not EOF(mfile) do
@@ -64,26 +86,51 @@ begin
         readln(mfile, last^.data);
         x := 1;
         while last^.data[x] <> #0 do    { Check for floors }
-        begin { todo composite into case }
-            if last^.data[x] in ['#', '.', '+'] then
-            begin
-                new(tmpflr);
-                tmpflr^.next := flr;
-                tmpflr^.x := x;
-                tmpflr^.y := y;
-                flr := tmpflr;
+        begin 
+            case last^.data[x] of
+                '@':
+                begin
+                    c.x := x;
+                    c.y := y;
+                end;
+
+                '#':
+                begin
+                    new(tpth);
+                    tpth^.next := pth;
+                    tpth^.x := x;
+                    tpth^.y := y;
+                    pth := tpth;
+                end;
+
+                '.':
+                begin
+                    new(tgrn);
+                    tgrn^.next := grn;
+                    tgrn^.x := x;
+                    tgrn^.y := y;
+                    grn := tgrn;
+                end;
+
+                '+':
+                begin
+                     new(tdr);
+                     tdr^.next := dr;
+                     tdr^.x := x;
+                     tdr^.y := y;
+                     dr := tdr;
+                end;
             end;
-            if last^.data[x] = '@' then
-            begin
-                c.x := x;
-                c.y := y;
-            end;
+
             x += 1;
         end;
         last^.next := nil;
         y += 1;
     end;
     close(mfile);
+    flr.p := pth;
+    flr.g := grn;
+    flr.d := dr;
 end;
 
 procedure showM(m: pmap);
@@ -99,20 +146,6 @@ begin
         y += 1;
     end;
 end;
-
-function isXYfree(flr: pfloor; x, y: integer): boolean;
-begin
-    while flr <> nil do
-    begin
-        if (flr^.x = x) and (flr^.y = y) then
-        begin
-            isXYfree := true;
-            exit;
-        end;
-        flr := flr^.next;
-    end;
-    isXYfree := false;
-end;
 { /MAP }
 
 { Character }
@@ -122,34 +155,116 @@ begin
     write(c.s);
 end;
 
-procedure hideC(c: character);
+procedure hideC(c: character; loc: char);
 begin
     GotoXY(c.x, c.y);
-    write('.');
+    write(loc);
 end;
 
-procedure moveC(flr: pfloor; var c: character);
+function canIMove(flr: floor; c: character; ch: char): boolean;
+begin
+    case ch of      { count x, y }
+        'w': c.y -= 1;
+        'a': c.x -= 1;
+        's': c.y += 1;
+        'd': c.x += 1;
+    end;
+    while flr.p <> nil do       { Check path }
+    begin
+        if (flr.p^.x = c.x) and (flr.p^.y = c.y) then
+        begin
+            CanIMove := true;
+            exit;
+        end;
+        flr.p := flr.p^.next;
+    end;
+    while flr.g <> nil do       { Check ground }
+    begin
+        if (flr.g^.x = c.x) and (flr.g^.y = c.y) then
+        begin
+            CanIMove := true;
+            exit;
+        end;
+        flr.g := flr.g^.next;
+    end;
+    while flr.d <> nil do       { Check door }
+    begin
+        if (flr.d^.x = c.x) and (flr.d^.y = c.y) then
+        begin
+            CanIMove := true;
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
+    canIMove := false;
+end;
+
+function whereAmI(flr: floor; c: character): char;
+begin
+    while flr.p <> nil do
+    begin
+        if (flr.p^.x = c.x) and (flr.p^.y = c.y) then
+        begin
+            whereAmI := '#';
+            exit;
+        end;
+        flr.p := flr.p^.next;
+    end;
+    while flr.g <> nil do
+    begin
+        if (flr.g^.x = c.x) and (flr.g^.y = c.y) then
+        begin
+            whereAmI := '.';
+            exit;
+        end;
+        flr.g := flr.g^.next;
+    end;
+    while flr.d <> nil do
+    begin
+        if (flr.d^.x = c.x) and (flr.d^.y = c.y) then
+        begin
+            whereAmI := '+';
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
+    WhereAmI := #0;
+end;
+
+procedure moveC(flr: floor; var c: character; ch: char);
+var
+    loc: char;      { Location }
+begin
+    if not canIMove(flr, c, ch) then
+        exit;
+    loc := whereAmI(flr, c);
+    hideC(c, loc);
+    case ch of
+        'w': c.y -= 1;
+        'a': c.x -= 1;
+        's': c.y += 1;
+        'd': c.x += 1;
+    end;
+    showC(c);
+end;
+
+procedure handleKey(flr: floor; var c: character);
 var
     ch: char;
 begin
-    hideC(c);
     ch := ReadKey;
     case ch of
-        'w': if isXYfree(flr, c.x, c.y-1) then c.y -= 1;
-        'a': if isXYfree(flr, c.x-1, c.y) then c.x -= 1;
-        's': if isXYfree(flr, c.x, c.y+1) then c.y += 1;
-        'd': if isXYfree(flr, c.x+1, c.y) then c.x += 1;
+        'w','a','s','d': moveC(flr, c, ch);
         #27:
         begin 
             clrscr;
             halt;
         end;
     end;
-    showC(c);
 end;
 { /Character }
 
-procedure init(var m: pmap; var flr: pfloor; var c: character);
+procedure init(var m: pmap; var flr: floor; var c: character);
 begin
     parseM(m, flr, c);
     c.s := '@';
@@ -157,17 +272,17 @@ end;
 
 var
     m: pmap;
-    flr: pfloor;
+    flr: floor;
     c: character;
 begin
-    ScreenCheck();
+    screenCheck();
     clrscr;
     init(m, flr, c);
     showM(m);
     while true do
     begin
         if KeyPressed then
-            moveC(flr, c);
+            handleKey(flr, c);
         delay(50);
     end;
 end.

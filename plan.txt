@@ -1,9 +1,0 @@
-character > use money, hp; make inventory;
-maps > make fov, gatein, gateout;
-GUI > one line at the top for hp, 2 lns at the bottom for what happened;
-pathfinding > ;
-monsters > ;
-combat > ;
-items > ;
-shops > ;
-saving > ;

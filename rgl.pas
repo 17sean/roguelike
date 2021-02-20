@@ -45,6 +45,12 @@ type
         b: pbuilding;
     end;
 
+    pfloorInside = ^floorInside;
+    floorInside = record
+       x, y: integer;
+       next: ^floorInside;
+    end;
+
     character = record
         s: char;    { Symbol }
         x, y: integer;
@@ -196,6 +202,34 @@ end;
 { /MAP }
 
 { FOV }
+function isPath(flr: floor; x, y: integer): boolean;
+begin
+    while flr.p <> nil do
+    begin
+        if (x = flr.p^.x) and (y = flr.p^.y) then
+        begin
+            isPath := true;
+            exit;
+        end;
+        flr.p := flr.p^.next;
+    end;
+    isPath := false;
+end;
+
+function isGround(flr: floor; x, y: integer): boolean;
+begin
+    while flr.g <> nil do
+    begin
+        if (x = flr.g^.x) and (y = flr.g^.y) then
+        begin
+            isGround := true;
+            exit;
+        end;
+        flr.g := flr.g^.next;
+    end;
+    isGround := false;
+end;
+
 function isWall(flr: floor; x, y: integer): boolean;
 begin
     while flr.w <> nil do
@@ -219,15 +253,13 @@ begin
     isWall := false
 end;
 
-function isBuilding(flr: floor; x, y: integer; res: building)
-                                                        : boolean;
+function isBuilding(flr: floor; x, y: integer): boolean;
 begin
     while flr.b <> nil do
     begin
         if (x = flr.b^.x) and (y = flr.b^.y) then
         begin
             isBuilding := true;
-            res := flr.b^;
             exit;
         end;
         flr.b := flr.b^.next;
@@ -235,18 +267,23 @@ begin
     isBuilding := false;
 end;
 
-function findB(flr: floor; c: character; var res: building)
-                                                        : boolean;
+function findB(flr: floor; c: character): boolean;
 var
     x, y: integer;
 begin
-    x := c.x;
+    if not isGround(flr, c.x, c.y) then
+    begin
+        findB := false;
+        exit;
+    end;
+
     y := c.y;
     while not isWall(flr, c.x, y) do     { top }
     begin
+        x := c.x;
         while not isWall(flr, x, y) do       { left }
         begin
-            if isBuilding(flr, x, y, res) then
+            if isBuilding(flr, x, y) then
             begin
                 findB := true;
                 exit;
@@ -256,7 +293,7 @@ begin
         x := c.x;
         while not isWall(flr, x, y) do       { right }
         begin
-            if isBuilding(flr, x, y, res) then
+            if isBuilding(flr, x, y) then
             begin
                 findB := true;
                 exit;
@@ -265,13 +302,13 @@ begin
         end;
         y -= 1;
     end;
-    x := c.x;
     y := c.y + 1;
     while not isWall(flr, c.x, y) do     { bottom }
     begin
+        x := c.x;
         while not isWall(flr, x, y) do       { left }
         begin
-            if isBuilding(flr, x, y, res) then
+            if isBuilding(flr, x, y) then
             begin
                 findB := true;
                 exit;
@@ -281,7 +318,7 @@ begin
         x := c.x;
         while not isWall(flr, x, y) do       { right }
         begin
-            if isBuilding(flr, x, y, res) then
+            if isBuilding(flr, x, y) then
             begin
                 findB := true;
                 exit;
@@ -292,11 +329,86 @@ begin
     end;
 end;
 
-procedure showFov(); { todo }
-{ for realization i need to know coordinates of monsters and iteams for compare }
-{ need count what applies to the building and show it if compare give true }
+procedure addFlrIns(var flrIns: pfloorInside; x, y: integer);
+var
+    tflrIns: pfloorInside;
 begin
+    new(tflrIns);
+    tflrIns^.next := flrIns;
+    tflrIns^.x := x;
+    tflrIns^.y := y;
+    flrIns := tflrIns;
+end;
 
+function isInFlrIns(flrIns: pfloorInside; x, y: integer)
+                                                    : boolean;
+begin
+    while flrIns <> nil do
+    begin
+        if (x = flrIns^.x) and (y = flrIns^.y) then
+        begin
+            isInFlrIns := true;
+            exit;
+        end;
+        flrIns := flrIns^.next;
+    end;
+    isInFlrIns := false;
+end;
+
+procedure showFov(flr: floor; c: character); { todo add monsters and items }
+var
+    flrIns: pfloorInside;
+    x, y: integer;
+begin
+    flrIns := nil;
+    y := c.y;
+    { count all x, y in building }
+    while not isWall(flr, c.x, y) do     { top }
+    begin
+        x := c.x;
+        while not isWall(flr, x, y) do         { left }
+        begin
+            addFlrIns(flrIns, x, y);
+            x -= 1;
+        end; 
+        x := c.x;
+        while not isWall(flr, x, y) do         { right }
+        begin
+            addFlrIns(flrIns, x, y);
+            x += 1;
+        end;
+        y -= 1;
+    end;
+    y := c.y + 1;
+    while not isWall(flr, c.x, y) do     { bottom }
+    begin
+        x := c.x;
+        while not isWall(flr, x, y) do          { left }
+        begin
+            addFlrIns(flrIns, x, y);
+            x -= 1;
+        end; 
+        x := c.x;
+        while not isWall(flr, x, y) do          { right }
+        begin
+            addFlrIns(flrIns, x, y);
+            x += 1;
+        end;
+        y += 1;
+    end;
+
+    { show all that inside building }
+    while flr.g <> nil do
+    begin
+        if isInFlrIns(flrIns, flr.g^.x, flr.g^.y) then
+        begin
+            GotoXY(flr.g^.x, flr.g^.y);
+            write('.');
+        end;
+        flr.g := flr.g^.next;
+    end;
+    GotoXY(c.x, c.y);
+    write(c.s);
 end;
 
 procedure hideFov(flr: floor);
@@ -307,16 +419,16 @@ begin
     begin
         x := flr.b^.x;
         y := flr.b^.y;
-        while not isWall(flr, flr.b^.x, y) do     { top }
+        while not isWall(flr, flr.b^.x, y) do   { top }
         begin
-            while not isWall(flr, x, y) do       { left }
+            while not isWall(flr, x, y) do          { left }
             begin
                 GotoXY(x, y);
                 write(' ');
                 x -= 1;
             end; 
             x := flr.b^.x;
-            while not isWall(flr, x, y) do       { right }
+            while not isWall(flr, x, y) do          { right }
             begin
                 GotoXY(x, y);
                 write(' ');
@@ -326,16 +438,16 @@ begin
         end;
         x := flr.b^.x;
         y := flr.b^.y + 1;
-        while not isWall(flr, flr.b^.x, y) do     { bottom }
+        while not isWall(flr, flr.b^.x, y) do   { bottom }
         begin
-            while not isWall(flr, x, y) do       { left }
+            while not isWall(flr, x, y) do          { left }
             begin
                 GotoXY(x, y);
                 write(' ');
                 x -= 1;
             end; 
             x := flr.b^.x;
-            while not isWall(flr, x, y) do       { right }
+            while not isWall(flr, x, y) do          { right }
             begin
                 GotoXY(x, y);
                 write(' ');
@@ -347,17 +459,12 @@ begin
     end;
 end;
 
-procedure checkFov(flr: floor; c: character); { todo }
-{ i have bug with findB so i need to debug it }
-var
-    resb: building;     { result building }
+procedure checkFov(flr: floor; c: character);
 begin
-    {
-    hideFov(flr);
-    if findB(flr, c, resb) then
-        writeln('yeah i found');
-    }
-    if ((c.x = flr.b^.x) and (c.y = flr.b^.y)) then  { just temp for example }
+    { todo add pathfinding } 
+    if findB(flr, c) then
+        showFov(flr, c)
+    else
         hideFov(flr);
 end;
 { /FOV }
@@ -415,15 +522,6 @@ end;
 
 function whereAmI(flr: floor; c: character): char;
 begin
-    while flr.b <> nil do
-    begin
-        if (c.x = flr.b^.x) and (c.y = flr.b^.y) then
-        begin
-            whereAmI := ' ';
-            exit;
-        end;
-        flr.b := flr.b^.next;
-    end;
     while flr.p <> nil do
     begin
         if (c.x = flr.p^.x) and (c.y = flr.p^.y) then

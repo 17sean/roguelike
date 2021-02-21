@@ -45,12 +45,6 @@ type
         b: pbuilding;
     end;
 
-    pfloorInside = ^floorInside;
-    floorInside = record
-       x, y: integer;
-       next: ^floorInside;
-    end;
-
     character = record
         s: char;    { Symbol }
         x, y: integer;
@@ -72,10 +66,7 @@ begin
 end;
 
 { MAP }
-procedure parseM(
-                 var first: pmap;
-                 var flr: floor;
-                 var c: character);
+procedure parseMap(var first: pmap; var flr: floor; var c: character);
 var
     mfile: text;
     last: pmap;
@@ -127,6 +118,7 @@ begin
                 end;
                 '#':
                 begin
+                    last^.data[x] := ' ';
                     new(tp);
                     tp^.next := p;
                     tp^.x := x;
@@ -185,7 +177,7 @@ begin
     flr.b := b;
 end;
 
-procedure showM(m: pmap);
+procedure showMap(m: pmap);
 var
     y: integer;
 begin
@@ -203,8 +195,9 @@ end;
 { Init }
 procedure init(var m: pmap; var flr: floor; var c: character);
 begin
-    parseM(m, flr, c);
+    parseMap(m, flr, c);
     c.s := '@';
+    TextColor(yellow);
 end;
 { /Init }
 
@@ -274,13 +267,13 @@ begin
     isBuilding := false;
 end;
 
-function findB(flr: floor; c: character): boolean;
+function findBuilding(flr: floor; c: character): boolean;
 var
     x, y: integer;
 begin
     if not isGround(flr, c.x, c.y) then
     begin
-        findB := false;
+        findBuilding := false;
         exit;
     end;
 
@@ -292,7 +285,7 @@ begin
         begin
             if isBuilding(flr, x, y) then
             begin
-                findB := true;
+                findBuilding := true;
                 exit;
             end;
             x -= 1;
@@ -302,7 +295,7 @@ begin
         begin
             if isBuilding(flr, x, y) then
             begin
-                findB := true;
+                findBuilding := true;
                 exit;
             end;
             x += 1;
@@ -317,7 +310,7 @@ begin
         begin
             if isBuilding(flr, x, y) then
             begin
-                findB := true;
+                findBuilding := true;
                 exit;
             end;
             x -= 1;
@@ -327,7 +320,7 @@ begin
         begin
             if isBuilding(flr, x, y) then
             begin
-                findB := true;
+                findBuilding := true;
                 exit;
             end;
             x += 1;
@@ -336,9 +329,9 @@ begin
     end;
 end;
 
-procedure addFlrIns(var flrIns: pfloorInside; x, y: integer);
+procedure addFlrIns(var flrIns: pground; x, y: integer);
 var
-    tflrIns: pfloorInside;
+    tflrIns: pground;
 begin
     new(tflrIns);
     tflrIns^.next := flrIns;
@@ -347,8 +340,7 @@ begin
     flrIns := tflrIns;
 end;
 
-function isInFlrIns(flrIns: pfloorInside; x, y: integer)
-                                                    : boolean;
+function isInFlrIns(flrIns: pground; x, y: integer): boolean;
 begin
     while flrIns <> nil do
     begin
@@ -362,9 +354,40 @@ begin
     isInFlrIns := false;
 end;
 
-procedure showB(flr: floor; c: character); { todo add monsters and items }
+procedure addPath(var p: ppath; x, y: integer);
 var
-    flrIns: pfloorInside;
+    tp: ppath;
+begin
+    new(tp);
+    tp^.next := p;
+    tp^.x := x;
+    tp^.y := y;
+    p := tp;
+end;
+
+procedure showPath(flr: floor; c: character);
+var
+    p: ppath;
+begin
+    p := nil;
+    addPath(p, c.x, c.y - 1);   { top }
+    addPath(p, c.x - 1, c.y);   { left }
+    addPath(p, c.x, c.y + 1);   { bottom }
+    addPath(p, c.x + 1, c.y);   { right }
+    while p <> nil do
+    begin
+        if isPath(flr, p^.x, p^.y) then
+        begin
+            GotoXY(p^.x, p^.y);
+            write('#');
+        end;
+        p := p^.next;
+    end;
+end;
+
+procedure showBuilding(flr: floor; c: character); { todo show monsters and items }
+var
+    flrIns: pground;
     x, y: integer;
 begin
     flrIns := nil;
@@ -418,7 +441,7 @@ begin
     write(c.s);
 end;
 
-procedure hideB(flr: floor);
+procedure hideBuilding(flr: floor);
 var
     x, y: integer;
 begin
@@ -468,34 +491,23 @@ end;
 
 procedure checkFov(flr: floor; c: character);
 begin
-    { todo add pathfinding }
-    if findB(flr, c) then
-        showB(flr, c)
+ { todo add monstersfinding and itemsfinding(items for first) for paths }
+    showPath(flr, c);
+    if findBuilding(flr, c) then
+        showBuilding(flr, c)
     else
-        hideB(flr);
+        hideBuilding(flr);
 end;
 { /FOV }
 
 { Character }
-procedure showC(c: character);
-begin
-    GotoXY(c.x, c.y);
-    write(c.s);
-end;
-
-procedure hideC(c: character; loc: char);
-begin
-    GotoXY(c.x, c.y);
-    write(loc);
-end;
-
 function canIMove(flr: floor; c: character; ch: char): boolean;
 begin
     case ch of      { count x, y }
-        'w': c.y -= 1;
-        'a': c.x -= 1;
-        's': c.y += 1;
-        'd': c.x += 1;
+        'w', 'W': c.y -= 1;
+        'a', 'A': c.x -= 1;
+        's', 'S': c.y += 1;
+        'd', 'D': c.x += 1;
     end;
     while flr.p <> nil do       { Check path }
     begin
@@ -559,6 +571,18 @@ begin
     WhereAmI := #0;
 end;
 
+procedure showC(c: character);
+begin
+    GotoXY(c.x, c.y);
+    write(c.s);
+end;
+
+procedure hideC(c: character; loc: char);
+begin
+    GotoXY(c.x, c.y);
+    write(loc);
+end;
+
 procedure moveC(flr: floor; var c: character; ch: char);
 var
     loc: char;      { Location }
@@ -568,10 +592,10 @@ begin
     loc := whereAmI(flr, c);
     hideC(c, loc);
     case ch of
-        'w': c.y -= 1;
-        'a': c.x -= 1;
-        's': c.y += 1;
-        'd': c.x += 1;
+        'w', 'W': c.y -= 1;
+        'a', 'A': c.x -= 1;
+        's', 'S': c.y += 1;
+        'd', 'D': c.x += 1;
     end;
     showC(c);
 end;
@@ -582,7 +606,7 @@ var
 begin
     ch := ReadKey;
     case ch of
-        'w','a','s','d': moveC(flr, c, ch);
+        'w','W','a','A','s','S','d','D': moveC(flr, c, ch);
         #27:
         begin 
             clrscr;
@@ -600,7 +624,7 @@ begin
     screenCheck();
     clrscr;
     init(m, flr, c);
-    showM(m);
+    showMap(m);
     checkFov(flr, c);
     while true do
     begin

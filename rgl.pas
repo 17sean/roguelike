@@ -198,8 +198,15 @@ begin
         y += 1;
     end;
 end;
-
 { /MAP }
+
+{ Init }
+procedure init(var m: pmap; var flr: floor; var c: character);
+begin
+    parseM(m, flr, c);
+    c.s := '@';
+end;
+{ /Init }
 
 { FOV }
 function isPath(flr: floor; x, y: integer): boolean;
@@ -290,7 +297,7 @@ begin
             end;
             x -= 1;
         end; 
-        x := c.x;
+        x := c.x + 1;
         while not isWall(flr, x, y) do       { right }
         begin
             if isBuilding(flr, x, y) then
@@ -315,7 +322,7 @@ begin
             end;
             x -= 1;
         end; 
-        x := c.x;
+        x := c.x + 1;
         while not isWall(flr, x, y) do       { right }
         begin
             if isBuilding(flr, x, y) then
@@ -355,7 +362,7 @@ begin
     isInFlrIns := false;
 end;
 
-procedure showFov(flr: floor; c: character); { todo add monsters and items }
+procedure showB(flr: floor; c: character); { todo add monsters and items }
 var
     flrIns: pfloorInside;
     x, y: integer;
@@ -371,7 +378,7 @@ begin
             addFlrIns(flrIns, x, y);
             x -= 1;
         end; 
-        x := c.x;
+        x := c.x + 1;
         while not isWall(flr, x, y) do         { right }
         begin
             addFlrIns(flrIns, x, y);
@@ -388,7 +395,7 @@ begin
             addFlrIns(flrIns, x, y);
             x -= 1;
         end; 
-        x := c.x;
+        x := c.x + 1;
         while not isWall(flr, x, y) do          { right }
         begin
             addFlrIns(flrIns, x, y);
@@ -411,23 +418,23 @@ begin
     write(c.s);
 end;
 
-procedure hideFov(flr: floor);
+procedure hideB(flr: floor);
 var
     x, y: integer;
 begin
     while flr.b <> nil do
     begin
-        x := flr.b^.x;
         y := flr.b^.y;
         while not isWall(flr, flr.b^.x, y) do   { top }
         begin
+            x := flr.b^.x;
             while not isWall(flr, x, y) do          { left }
             begin
                 GotoXY(x, y);
                 write(' ');
                 x -= 1;
             end; 
-            x := flr.b^.x;
+            x := flr.b^.x + 1;
             while not isWall(flr, x, y) do          { right }
             begin
                 GotoXY(x, y);
@@ -436,17 +443,17 @@ begin
             end;
             y -= 1;
         end;
-        x := flr.b^.x;
         y := flr.b^.y + 1;
         while not isWall(flr, flr.b^.x, y) do   { bottom }
         begin
+            x := flr.b^.x;
             while not isWall(flr, x, y) do          { left }
             begin
                 GotoXY(x, y);
                 write(' ');
                 x -= 1;
             end; 
-            x := flr.b^.x;
+            x := flr.b^.x + 1;
             while not isWall(flr, x, y) do          { right }
             begin
                 GotoXY(x, y);
@@ -461,11 +468,11 @@ end;
 
 procedure checkFov(flr: floor; c: character);
 begin
-    { todo add pathfinding } 
+    { todo add pathfinding }
     if findB(flr, c) then
-        showFov(flr, c)
+        showB(flr, c)
     else
-        hideFov(flr);
+        hideB(flr);
 end;
 { /FOV }
 
@@ -584,15 +591,6 @@ begin
     end;
 end;
 { /Character }
-
-procedure init(
-                var m: pmap;
-                var flr: floor;
-                var c: character);
-begin
-    parseM(m, flr, c);
-    c.s := '@';
-end;
 
 var
     m: pmap;

@@ -46,10 +46,21 @@ type
     end;
 
     character = record
-        s: char;    { Symbol }
         x, y: integer;
+        s: char;    { Symbol }
         hp: integer;
         money: integer;
+    end;
+
+    freakClass = (demented, hunter);
+
+    pfreak = ^freak;
+    freak = record
+        x, y: integer;
+        s: char;
+        class: freakClass;
+        hp: integer;
+        next: ^freak;
     end;
 
 procedure screenCheck();
@@ -66,7 +77,11 @@ begin
 end;
 
 { MAP }
-procedure parseMap(var first: pmap; var flr: floor; var c: character);
+procedure parseMap(
+                   var first: pmap;
+                   var flr: floor;
+                   var c: character;
+                   var f: pfreak);
 var
     mfile: text;
     last: pmap;
@@ -75,6 +90,7 @@ var
     d, td: pdoor;
     w, tw: pwall;
     b, tb: pbuilding;
+    tf: pfreak;
     x, y: integer;
 begin
     if not DFE('map.txt') then
@@ -87,6 +103,7 @@ begin
     d := nil;
     w := nil;
     b := nil;
+    f := nil;
     assign(mfile, 'map.txt');
     reset(mfile);
     while not EOF(mfile) do
@@ -127,6 +144,7 @@ begin
                 end;
                 '.':
                 begin
+                    last^.data[x] := ' ';
                     new(tg);
                     tg^.next := g;
                     tg^.x := x;
@@ -151,7 +169,7 @@ begin
                 end;
                 'b':
                 begin
-                    last^.data[x] := '.';
+                    last^.data[x] := ' ';
                     new(tb);
                     tb^.next := b;
                     tb^.x := x;
@@ -162,6 +180,37 @@ begin
                     tg^.x := x;
                     tg^.y := y;
                     g := tg;
+                end;
+                'D', 'H':
+                begin
+                    new(tf);
+                    tf^.next := f;
+                    tf^.x := x;
+                    tf^.y := y;
+                    tf^.hp := 100;
+                    tf^.s := last^.data[x];
+                    last^.data[x] := ' ';
+                    case tf^.s of
+                        'D':
+                        begin
+                            tf^.class := demented;
+                            new(tg);
+                            tg^.next := g;
+                            tg^.x := x;
+                            tg^.y := y;
+                            g := tg;
+                        end;
+                        'H':
+                        begin
+                            tf^.class := hunter;
+                            new(tp);
+                            tp^.next := p;
+                            tp^.x := x;
+                            tp^.y := y;
+                            p := tp;
+                        end;
+                    end;
+                    f := tf;
                 end;
             end;
             x += 1;
@@ -193,10 +242,15 @@ end;
 { /MAP }
 
 { Init }
-procedure init(var m: pmap; var flr: floor; var c: character);
+procedure init(
+               var m: pmap;
+               var flr: floor;
+               var c: character;
+               var f: pfreak);
 begin
-    parseMap(m, flr, c);
+    parseMap(m, flr, c, f);
     c.s := '@';
+    c.hp := 100;
     TextColor(yellow);
 end;
 { /Init }
@@ -265,6 +319,21 @@ begin
         flr.b := flr.b^.next;
     end;
     isBuilding := false;
+end;
+
+function isFreak(f: pfreak; x, y: integer; var ch: char): boolean;
+begin
+    while f <> nil do
+    begin
+        if (x = f^.x) and (y = f^.y) then
+        begin
+            isFreak := true;
+            ch := f^.s;
+            exit;
+        end;
+        f := f^.next;
+    end;
+    isFreak := false;
 end;
 
 function findBuilding(flr: floor; c: character): boolean;
@@ -365,30 +434,43 @@ begin
     p := tp;
 end;
 
-procedure showPath(flr: floor; c: character);
+procedure showPath(flr: floor; c: character; f: pfreak);
 var
-    p: ppath;
+    tp, p: ppath;
+    ch: char;
 begin
     p := nil;
     addPath(p, c.x, c.y - 1);   { top }
     addPath(p, c.x - 1, c.y);   { left }
     addPath(p, c.x, c.y + 1);   { bottom }
     addPath(p, c.x + 1, c.y);   { right }
-    while p <> nil do
+    tp := p;
+    while tp <> nil do
     begin
-        if isPath(flr, p^.x, p^.y) then
+        if isPath(flr, tp^.x, tp^.y) then
         begin
-            GotoXY(p^.x, p^.y);
+            GotoXY(tp^.x, tp^.y);
             write('#');
         end;
-        p := p^.next;
+        tp := tp^.next;
+    end;
+    tp := p;
+    while f <> nil do
+    begin
+        if isFreak(f, p^.x, p^.y, ch) then
+        begin
+            GotoXY(p^.x, p^.y);
+            write(ch);
+        end;
+        f := f^.next;
     end;
 end;
 
-procedure showBuilding(flr: floor; c: character); { todo show monsters and items }
+procedure showBuilding(flr: floor; c: character; f: pfreak); { todo show items }
 var
     flrIns: pground;
     x, y: integer;
+    ch: char;
 begin
     flrIns := nil;
     y := c.y;
@@ -430,11 +512,10 @@ begin
     { show all that inside building }
     while flr.g <> nil do
     begin
-        if isInFlrIns(flrIns, flr.g^.x, flr.g^.y) then
-        begin
-            GotoXY(flr.g^.x, flr.g^.y);
-            write('.');
-        end;
+        GotoXY(flr.g^.x, flr.g^.y);
+        write('.');
+        if isFreak(f, flr.g^.x, flr.g^.y, ch) then
+            write(ch);
         flr.g := flr.g^.next;
     end;
     GotoXY(c.x, c.y);
@@ -489,12 +570,12 @@ begin
     end;
 end;
 
-procedure checkFov(flr: floor; c: character);
+procedure checkFov(flr: floor; c: character; f: pfreak);
 begin
- { todo add monstersfinding and itemsfinding(items for first) for paths }
-    showPath(flr, c);
+ { todo itemsfinding(items for first after ground or path) }
+    showPath(flr, c, f);
     if findBuilding(flr, c) then
-        showBuilding(flr, c)
+        showBuilding(flr, c, f)
     else
         hideBuilding(flr);
 end;
@@ -600,7 +681,7 @@ begin
     showC(c);
 end;
 
-procedure handleKey(flr: floor; var c: character);
+procedure handleKey(flr: floor; var c: character; var f: pfreak);
 var
     ch: char;
 begin
@@ -620,18 +701,19 @@ var
     m: pmap;
     flr: floor;
     c: character;
+    f: pfreak;
 begin
     screenCheck();
     clrscr;
-    init(m, flr, c);
+    init(m, flr, c, f);
     showMap(m);
-    checkFov(flr, c);
+    checkFov(flr, c, f);
     while true do
     begin
         if KeyPressed then
         begin
-            handleKey(flr, c);
-            checkFov(flr, c);
+            handleKey(flr, c, f);
+            checkFov(flr, c, f);
         end;
     end;
 end.

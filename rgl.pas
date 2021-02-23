@@ -398,31 +398,6 @@ begin
     end;
 end;
 
-procedure addFlrIns(var flrIns: pground; x, y: integer);
-var
-    tflrIns: pground;
-begin
-    new(tflrIns);
-    tflrIns^.next := flrIns;
-    tflrIns^.x := x;
-    tflrIns^.y := y;
-    flrIns := tflrIns;
-end;
-
-function isInFlrIns(flrIns: pground; x, y: integer): boolean;
-begin
-    while flrIns <> nil do
-    begin
-        if (x = flrIns^.x) and (y = flrIns^.y) then
-        begin
-            isInFlrIns := true;
-            exit;
-        end;
-        flrIns := flrIns^.next;
-    end;
-    isInFlrIns := false;
-end;
-
 procedure addPath(var p: ppath; x, y: integer);
 var
     tp: ppath;
@@ -468,11 +443,9 @@ end;
 
 procedure showBuilding(flr: floor; c: character; f: pfreak); { todo show items }
 var
-    flrIns: pground;
     x, y: integer;
     ch: char;
 begin
-    flrIns := nil;
     y := c.y;
     { count all x, y in building }
     while not isWall(flr, c.x, y) do     { top }
@@ -480,13 +453,25 @@ begin
         x := c.x;
         while not isWall(flr, x, y) do         { left }
         begin
-            addFlrIns(flrIns, x, y);
+            GotoXY(x, y);
+            write('.');
+            if isFreak(f, x, y, ch) then
+            begin
+                GotoXY(x, y);
+                write(ch);
+            end;
             x -= 1;
         end; 
         x := c.x + 1;
         while not isWall(flr, x, y) do         { right }
         begin
-            addFlrIns(flrIns, x, y);
+            GotoXY(x, y);
+            write('.');
+            if isFreak(f, x, y, ch) then
+            begin
+                GotoXY(x, y);
+                write(ch);
+            end;
             x += 1;
         end;
         y -= 1;
@@ -497,33 +482,31 @@ begin
         x := c.x;
         while not isWall(flr, x, y) do          { left }
         begin
-            addFlrIns(flrIns, x, y);
+            GotoXY(x, y);
+            write('.');
+            if isFreak(f, x, y, ch) then
+            begin
+                GotoXY(x, y);
+                write(ch);
+            end;
             x -= 1;
         end; 
         x := c.x + 1;
         while not isWall(flr, x, y) do          { right }
         begin
-            addFlrIns(flrIns, x, y);
+            GotoXY(x, y);
+            write('.');
+            if isFreak(f, x, y, ch) then
+            begin
+                GotoXY(x, y);
+                write(ch);
+            end;
             x += 1;
         end;
         y += 1;
     end;
-
-    { show all that inside building }
-    while flrIns <> nil do
-    begin
-        GotoXY(flrIns^.x, flrIns^.y);
-        write('.');
-        if isFreak(f, flrIns^.x, flrIns^.y, ch) then
-        begin
-            GotoXY(flrIns^.x, flrIns^.y);
-            write(ch);
-        end;
-        flrIns := flrIns^.next;
-    end;
     GotoXY(c.x, c.y);
     write(c.s);
-    { todo ПУСТЬ ПИШЕТ ОТ ЧЕРЕКТЕРА ТОЧКИ И ПРОВЕРЯЕТ НА ФРИКА БУДЕТ БЫСТРЕЕ }
 end;
 
 procedure hideBuilding(flr: floor);

@@ -510,16 +510,20 @@ begin
     end;
 
     { show all that inside building }
-    while flr.g <> nil do
+    while flrIns <> nil do
     begin
-        GotoXY(flr.g^.x, flr.g^.y);
+        GotoXY(flrIns^.x, flrIns^.y);
         write('.');
-        if isFreak(f, flr.g^.x, flr.g^.y, ch) then
+        if isFreak(f, flrIns^.x, flrIns^.y, ch) then
+        begin
+            GotoXY(flrIns^.x, flrIns^.y);
             write(ch);
-        flr.g := flr.g^.next;
+        end;
+        flrIns := flrIns^.next;
     end;
     GotoXY(c.x, c.y);
     write(c.s);
+    { todo ПУСТЬ ПИШЕТ ОТ ЧЕРЕКТЕРА ТОЧКИ И ПРОВЕРЯЕТ НА ФРИКА БУДЕТ БЫСТРЕЕ }
 end;
 
 procedure hideBuilding(flr: floor);
@@ -582,7 +586,7 @@ end;
 { /FOV }
 
 { Character }
-function canIMove(flr: floor; c: character; ch: char): boolean;
+function canIMove(flr: floor; c: character; f: pfreak; ch: char): boolean;
 begin
     case ch of      { count x, y }
         'w', 'W': c.y -= 1;
@@ -590,9 +594,18 @@ begin
         's', 'S': c.y += 1;
         'd', 'D': c.x += 1;
     end;
+    while f <> nil do          { Check freaks }
+    begin
+        if (c.x = f^.x) and (c.y = f^.y) then
+        begin
+            CanIMove := false;
+            exit;
+        end;
+        f := f^.next;
+    end;
     while flr.p <> nil do       { Check path }
     begin
-        if (flr.p^.x = c.x) and (flr.p^.y = c.y) then
+        if (c.x = flr.p^.x) and (c.y = flr.p^.y) then
         begin
             CanIMove := true;
             exit;
@@ -601,7 +614,7 @@ begin
     end;
     while flr.g <> nil do       { Check ground }
     begin
-        if (flr.g^.x = c.x) and (flr.g^.y = c.y) then
+        if (c.x = flr.g^.x) and (c.y = flr.g^.y) then
         begin
             CanIMove := true;
             exit;
@@ -610,7 +623,7 @@ begin
     end;
     while flr.d <> nil do       { Check door }
     begin
-        if (flr.d^.x = c.x) and (flr.d^.y = c.y) then
+        if (c.x = flr.d^.x) and (c.y = flr.d^.y) then
         begin
             CanIMove := true;
             exit;
@@ -664,11 +677,11 @@ begin
     write(loc);
 end;
 
-procedure moveC(flr: floor; var c: character; ch: char);
+procedure moveC(flr: floor; var c: character; f: pfreak; ch: char);
 var
     loc: char;      { Location }
 begin
-    if not canIMove(flr, c, ch) then
+    if not canIMove(flr, c, f, ch) then
         exit;
     loc := whereAmI(flr, c);
     hideC(c, loc);
@@ -687,7 +700,7 @@ var
 begin
     ch := ReadKey;
     case ch of
-        'w','W','a','A','s','S','d','D': moveC(flr, c, ch);
+        'w','W','a','A','s','S','d','D': moveC(flr, c, f, ch);
         #27:
         begin 
             clrscr;

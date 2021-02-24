@@ -49,7 +49,7 @@ type
         x, y: integer;
         s: char;    { Symbol }
         hp: integer;
-        money: integer;
+        melee: integer;
     end;
 
     freakClass = (demented, hunter);
@@ -187,7 +187,7 @@ begin
                     tf^.next := f;
                     tf^.x := x;
                     tf^.y := y;
-                    tf^.hp := 100;
+                    tf^.hp := 10;
                     tf^.s := last^.data[x];
                     last^.data[x] := ' ';
                     case tf^.s of
@@ -251,7 +251,9 @@ begin
     parseMap(m, flr, c, f);
     c.s := '@';
     c.hp := 100;
+    c.melee := 3;
     TextColor(yellow);
+    randomize;
 end;
 { /Init }
 
@@ -334,6 +336,22 @@ begin
         f := f^.next;
     end;
     isFreak := false;
+end;
+
+function findFreak(f: pfreak; x, y: integer; var res: pfreak): boolean;
+begin
+    while f <> nil do
+    begin
+        if (x = f^.x) and (y = f^.y) then
+        begin
+            findFreak := true;
+            res := f;
+            exit;
+        end;
+        f := f^.next;
+    end;
+    findFreak := false;
+    res := nil;
 end;
 
 function findBuilding(flr: floor; c: character): boolean;
@@ -419,6 +437,10 @@ begin
     addPath(p, c.x - 1, c.y);   { left }
     addPath(p, c.x, c.y + 1);   { bottom }
     addPath(p, c.x + 1, c.y);   { right }
+    addPath(p, c.x - 1, c.y - 1);       { top left }
+    addPath(p, c.x - 1, c.y + 1);       { bottom left }
+    addPath(p, c.x + 1, c.y + 1);       { bottom right }
+    addPath(p, c.x + 1, c.y - 1);       { top right }
     tp := p;
     while tp <> nil do
     begin
@@ -430,18 +452,18 @@ begin
         tp := tp^.next;
     end;
     tp := p;
-    while f <> nil do
+    while tp <> nil do
     begin
-        if isFreak(f, p^.x, p^.y, ch) then
+        if isFreak(f, tp^.x, tp^.y, ch) then
         begin
-            GotoXY(p^.x, p^.y);
+            GotoXY(tp^.x, tp^.y);
             write(ch);
         end;
-        f := f^.next;
+        tp := tp^.next;
     end;
 end;
 
-procedure showBuilding(flr: floor; c: character; f: pfreak); { todo show items }
+procedure showBuilding(flr: floor; c: character; f: pfreak);
 var
     x, y: integer;
     ch: char;
@@ -559,7 +581,6 @@ end;
 
 procedure checkFov(flr: floor; c: character; f: pfreak);
 begin
- { todo itemsfinding(items for first after ground or path) }
     showPath(flr, c, f);
     if findBuilding(flr, c) then
         showBuilding(flr, c, f)
@@ -567,6 +588,19 @@ begin
         hideBuilding(flr);
 end;
 { /FOV }
+
+{ Freak }
+procedure removeF(var f, t: pfreak);
+var
+    pp: ^pfreak;
+begin
+    pp := @f;
+    while pp^ <> t do
+        pp := @(pp^^.next);
+    pp^ := pp^^.next;
+    dispose(t);
+end;
+{ /Freak } 
 
 { Character }
 function canIMove(flr: floor; c: character; f: pfreak; ch: char): boolean;
@@ -677,6 +711,58 @@ begin
     showC(c);
 end;
 
+procedure hitMsgC(dmg: integer);
+var
+    i: integer;
+begin
+    GotoXY(1, ScreenHeight - 1);
+    for i := 1 to ScreenWidth do     { clear }
+        write(' ');
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
+    if dmg > 0 then
+        write('You attacked. Damage ', dmg)
+    else
+        write('You didn`t hit');
+end;
+
+procedure combatC(c: character; var f: pfreak);
+var
+    p: ppath;
+    t: pfreak;     { target freak } 
+begin
+    c.melee -= random(c.melee+1);
+    if c.melee = 0 then
+    begin
+        hitMsgC(0);
+        exit;
+    end;
+    t := nil;
+    p := nil;
+    addPath(p, c.x, c.y - 1);   { top } 
+    addPath(p, c.x - 1, c.y);   { left }
+    addPath(p, c.x, c.y + 1);   { bottom }
+    addPath(p, c.x + 1, c.y);   { right }
+    addPath(p, c.x - 1, c.y - 1);       { top left }
+    addPath(p, c.x - 1, c.y + 1);       { bottom left }
+    addPath(p, c.x + 1, c.y + 1);       { bottom right }
+    addPath(p, c.x + 1, c.y - 1);       { top right }
+    while p <> nil do
+    begin
+        if findFreak(f, p^.x, p^.y, t) then
+            break;
+        p := p^.next;
+    end;
+    if t = nil then     { if haven`t got target } 
+    begin
+        hitMsgC(0);
+        exit;
+    end;
+    t^.hp -= c.melee;
+    hitMsgC(c.melee);
+    if t^.hp <= 0 then
+        removeF(f, t);
+end;
+
 procedure handleKey(flr: floor; var c: character; var f: pfreak);
 var
     ch: char;
@@ -684,6 +770,7 @@ begin
     ch := ReadKey;
     case ch of
         'w','W','a','A','s','S','d','D': moveC(flr, c, f, ch);
+        'e', 'E': combatC(c, f);
         #27:
         begin 
             clrscr;

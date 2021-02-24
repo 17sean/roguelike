@@ -65,7 +65,7 @@ type
 
 procedure screenCheck();
 begin
-    if (ScreenHeight < 22) or (Screenwidth < 75) then
+    if (ScreenHeight < 23) or (Screenwidth < 76) then
     begin
         clrscr;
         GotoXY((ScreenWidth - 15) div 2, ScreenHeight div 2);
@@ -238,6 +238,18 @@ begin
         m := m^.next;
         y += 1;
     end;
+end;
+
+procedure clearHappen;
+var
+    i: integer;
+begin
+    GotoXY(1, ScreenHeight - 2);    { clear }
+    for i := 1 to ScreenWidth do
+        write(' ');
+    GotoXY(1, ScreenHeight - 1);
+    for i := 1 to ScreenWidth do
+        write(' ');
 end;
 { /MAP }
 
@@ -614,6 +626,12 @@ begin
     pp^ := pp^^.next;
     dispose(t);
 end;
+
+procedure deadMsgF(t: pfreak);
+begin
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
+    write(t^.class, ' is dead');
+end;
 { /Freak } 
 
 { Character }
@@ -726,12 +744,7 @@ begin
 end;
 
 procedure hitMsgC(dmg: integer);
-var
-    i: integer;
 begin
-    GotoXY(1, ScreenHeight - 2);
-    for i := 1 to ScreenWidth do     { clear }
-        write(' ');
     GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
     if dmg > 0 then
         write('You attacked. Damage ', dmg)
@@ -774,7 +787,10 @@ begin
     t^.hp -= c.melee;
     hitMsgC(c.melee);
     if t^.hp <= 0 then
+    begin
+        deadMsgF(t);
         removeF(f, t);
+    end;
 end;
 
 procedure handleKey(flr: floor; var c: character; var f: pfreak);
@@ -809,6 +825,7 @@ begin
     begin
         if KeyPressed then
         begin
+            clearHappen();
             handleKey(flr, c, f);
             checkFov(flr, c, f);
         end;

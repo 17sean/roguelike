@@ -286,6 +286,20 @@ begin
     isGround := false;
 end;
 
+function isDoor(flr: floor; x, y: integer): boolean;
+begin
+    while flr.d <> nil do
+    begin
+        if (x = flr.d^.x) and (y = flr.d^.y) then
+        begin
+            isDoor := true;
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
+    isDoor := false;
+end;
+
 function isWall(flr: floor; x, y: integer): boolean;
 begin
     while flr.w <> nil do
@@ -321,37 +335,6 @@ begin
         flr.b := flr.b^.next;
     end;
     isBuilding := false;
-end;
-
-function isFreak(f: pfreak; x, y: integer; var ch: char): boolean;
-begin
-    while f <> nil do
-    begin
-        if (x = f^.x) and (y = f^.y) then
-        begin
-            isFreak := true;
-            ch := f^.s;
-            exit;
-        end;
-        f := f^.next;
-    end;
-    isFreak := false;
-end;
-
-function findFreak(f: pfreak; x, y: integer; var res: pfreak): boolean;
-begin
-    while f <> nil do
-    begin
-        if (x = f^.x) and (y = f^.y) then
-        begin
-            findFreak := true;
-            res := f;
-            exit;
-        end;
-        f := f^.next;
-    end;
-    findFreak := false;
-    res := nil;
 end;
 
 function findBuilding(flr: floor; c: character): boolean;
@@ -414,6 +397,37 @@ begin
         end;
         y += 1;
     end;
+end;
+
+function isFreak(f: pfreak; x, y: integer; var ch: char): boolean;
+begin
+    while f <> nil do
+    begin
+        if (x = f^.x) and (y = f^.y) then
+        begin
+            isFreak := true;
+            ch := f^.s;
+            exit;
+        end;
+        f := f^.next;
+    end;
+    isFreak := false;
+end;
+
+function findFreak(f: pfreak; x, y: integer; var res: pfreak): boolean;
+begin
+    while f <> nil do
+    begin
+        if (x = f^.x) and (y = f^.y) then
+        begin
+            findFreak := true;
+            res := f;
+            exit;
+        end;
+        f := f^.next;
+    end;
+    findFreak := false;
+    res := nil;
 end;
 
 procedure addPath(var p: ppath; x, y: integer);
@@ -584,7 +598,7 @@ begin
     showPath(flr, c, f);
     if findBuilding(flr, c) then
         showBuilding(flr, c, f)
-    else
+    else if isDoor(flr, c.x, c.y) then
         hideBuilding(flr);
 end;
 { /FOV }
@@ -715,10 +729,10 @@ procedure hitMsgC(dmg: integer);
 var
     i: integer;
 begin
-    GotoXY(1, ScreenHeight - 1);
+    GotoXY(1, ScreenHeight - 2);
     for i := 1 to ScreenWidth do     { clear }
         write(' ');
-    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
     if dmg > 0 then
         write('You attacked. Damage ', dmg)
     else

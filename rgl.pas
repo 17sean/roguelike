@@ -263,7 +263,7 @@ begin
     parseMap(m, flr, c, f);
     c.s := '@';
     c.hp := 100;
-    c.melee := 3;
+    c.melee := 6;
     TextColor(yellow);
     randomize;
 end;
@@ -756,13 +756,15 @@ procedure combatC(c: character; var f: pfreak);
 var
     p: ppath;
     t: pfreak;     { target freak } 
+    chance, dmg: integer;
 begin
-    c.melee -= random(c.melee+1);
-    if c.melee = 0 then
+    chance := random(25) + 1;    { chance for miss hit }
+    if chance = 1 then
     begin
         hitMsgC(0);
         exit;
     end;
+    dmg := c.melee - random(c.melee div 2);   { random damage } 
     t := nil;
     p := nil;
     addPath(p, c.x, c.y - 1);   { top } 
@@ -784,8 +786,8 @@ begin
         hitMsgC(0);
         exit;
     end;
-    t^.hp -= c.melee;
-    hitMsgC(c.melee);
+    t^.hp -= dmg;
+    hitMsgC(dmg);
     if t^.hp <= 0 then
     begin
         deadMsgF(t);

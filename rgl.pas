@@ -49,11 +49,10 @@ type
         x, y: integer;
         s: char;    { Symbol }
         hp: integer;
-        melee: integer;
+        melee, range: integer;
     end;
 
-    freakClass = (demented, hunter);
-
+    freakClass = (Demented, Hunter);
     pfreak = ^freak;
     freak = record
         x, y: integer;
@@ -193,7 +192,7 @@ begin
                     case tf^.s of
                         'D':
                         begin
-                            tf^.class := demented;
+                            tf^.class := Demented;
                             new(tg);
                             tg^.next := g;
                             tg^.x := x;
@@ -202,7 +201,7 @@ begin
                         end;
                         'H':
                         begin
-                            tf^.class := hunter;
+                            tf^.class := Hunter;
                             new(tp);
                             tp^.next := p;
                             tp^.x := x;
@@ -226,8 +225,9 @@ begin
     flr.b := b;
 end;
 
-procedure showMap(m: pmap);
+procedure showMap(var m: pmap);
 var
+    tm: pmap;
     y: integer;
 begin
     y := 1;
@@ -235,12 +235,14 @@ begin
     begin
         GotoXY(1, y);
         write(m^.data);
+        tm := m;
         m := m^.next;
+        dispose(tm);
         y += 1;
     end;
 end;
 
-procedure clearHappen;
+procedure clearHappen();
 var
     i: integer;
 begin
@@ -263,10 +265,9 @@ begin
     parseMap(m, flr, c, f);
     c.s := '@';
     c.hp := 100;
-    c.melee := 6;
-    {
+    c.melee := 4;
+    c.range := 7;
     TextColor(yellow);
-    }
     randomize;
 end;
 { /Init }
@@ -284,6 +285,36 @@ begin
         flr.p := flr.p^.next;
     end;
     isPath := false;
+end;
+
+procedure addPath(var p: ppath; x, y: integer);
+var
+    tp: ppath;
+begin
+    new(tp);
+    tp^.next := p;
+    tp^.x := x;
+    tp^.y := y;
+    p := tp;
+end;
+
+procedure reversePath(var p: ppath);
+var
+    tp, rp: ppath;
+begin
+    rp := nil;
+    while p <> nil do
+    begin
+        new(tp);
+        tp^.next := rp;
+        tp^.x := p^.x;
+        tp^.y := p^.y;
+        rp := tp;
+        tp := p;
+        p := p^.next;
+        dispose(tp);
+    end;
+    p := rp;
 end;
 
 function isGround(flr: floor; x, y: integer): boolean;
@@ -444,17 +475,6 @@ begin
     res := nil;
 end;
 
-procedure addPath(var p: ppath; x, y: integer);
-var
-    tp: ppath;
-begin
-    new(tp);
-    tp^.next := p;
-    tp^.x := x;
-    tp^.y := y;
-    p := tp;
-end;
-
 procedure showPath(flr: floor; c: character; f: pfreak);
 var
     tp, p: ppath;
@@ -496,7 +516,6 @@ var
     ch: char;
 begin
     y := c.y;
-    { count all x, y in building }
     while not isWall(flr, c.x, y) do     { top }
     begin
         x := c.x;
@@ -744,13 +763,18 @@ begin
     showC(c);
 end;
 
-procedure hitMsgC(dmg: integer);
+procedure hitMsgC(dmg: integer; ch: char);
 begin
     GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
-    if dmg > 0 then
-        write('You attacked. Damage ', dmg)
-    else
+    if dmg <= 0 then
+    begin
         write('You didn`t hit');
+        exit;
+    end;
+    case ch of
+        'm': write('You attacked. Damage ', dmg);
+        'r': write('You fired. Damage ', dmg);
+    end;
 end;
 
 procedure meleeC(c: character; var f: pfreak);
@@ -762,18 +786,16 @@ begin
     chance := random(25) + 1;    { chance for miss hit }
     if chance = 1 then
     begin
-        hitMsgC(0);
+        hitMsgC(0, 'm');
         exit;
     end;
-    dmg := c.melee - random(c.melee div 2);   { random damage } 
+
     p := nil;
     c.x -= 1;
     c.y -= 1;
     for i := 0 to 2 do
-    begin
         for j := 0 to 2 do
             addPath(p, c.x + j, c.y + i);
-    end;
     t := nil;
     while p <> nil do
     begin
@@ -783,11 +805,12 @@ begin
     end;
     if t = nil then     { if haven`t got target } 
     begin
-        hitMsgC(0);
+        hitMsgC(0, 'm');
         exit;
     end;
+    dmg := c.melee - random(c.melee div 2);   { random damage } 
     t^.hp -= dmg;
-    hitMsgC(dmg);
+    hitMsgC(dmg, 'm');
     if t^.hp <= 0 then
     begin
         deadMsgF(t);
@@ -795,28 +818,44 @@ begin
     end;
 end;
 
-procedure rangeC(c: character; var f: pfreak);
+procedure rangeC(flr: floor; c: character; var f: pfreak);
 var
     p: ppath;
     t: pfreak;     { target freak } 
-    i, j, chance, dmg: integer;
+    i, j, x, y, chance, dmg: integer;
 begin
     chance := random(25) + 1;    { chance for miss hit }
     if chance = 1 then
     begin
-        hitMsgC(0);
+        hitMsgC(0, 'r');
         exit;
     end;
-    dmg := c.melee - random(c.melee div 2);   { random damage } 
+
     p := nil;
-    c.x -= 1;
-    c.y -= 1;
-    for i := 0 to 2 do
-    begin
-        for j := 0 to 2 do
-            addPath(p, c.x + j, c.y + i);
-    end;
-    t := nil;
+    x := c.x;           
+    y := c.y;
+    for i := 1 to 3 do     { vertical }
+        if not isWall(flr, x, y + i) then
+            addPath(p, x, y + i)
+        else
+            break;
+    for i := 1 to 3 do
+        if not isWall(flr, x, y - i) then
+            addPath(p, x, y - i)
+        else
+            break;
+    for j := 1 to 3 do      { horizontal }
+        if not isWall(flr, x + j, y) then
+            addPath(p, x + j, y)
+        else
+            break;
+    for j := 1 to 3 do
+        if not isWall(flr, x - j, y) then
+            addPath(p, x - j, y)
+        else
+            break;
+    reversePath(p);
+    t := nil;           { find target }
     while p <> nil do
     begin
         if findFreak(f, p^.x, p^.y, t) then
@@ -825,11 +864,12 @@ begin
     end;
     if t = nil then     { if haven`t got target } 
     begin
-        hitMsgC(0);
+        hitMsgC(0, 'r');
         exit;
     end;
+    dmg := c.range - random(c.range div 2);   { random damage } 
     t^.hp -= dmg;
-    hitMsgC(dmg);
+    hitMsgC(dmg, 'r');
     if t^.hp <= 0 then
     begin
         deadMsgF(t);
@@ -844,7 +884,7 @@ begin
     case ch of
         'w','W','a','A','s','S','d','D': moveC(flr, c, f, ch);
         'e', 'E': meleeC(c, f);
-        'q', 'Q': rangeC(c, f);
+        'q', 'Q': rangeC(flr, c, f);
         #27:
         begin 
             clrscr;

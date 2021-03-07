@@ -285,6 +285,38 @@ end;
 { /Init }
 
 { FOV }
+function whatXY(flr: floor; x, y: integer): char;
+begin
+    while flr.p <> nil do
+    begin
+        if (x = flr.p^.x) and (y = flr.p^.y) then
+        begin
+            whatXY := '#';
+            exit;
+        end;
+        flr.p := flr.p^.next;
+    end;
+    while flr.g <> nil do
+    begin
+        if (x = flr.g^.x) and (y = flr.g^.y) then
+        begin
+            whatXY := '.';
+            exit;
+        end;
+        flr.g := flr.g^.next;
+    end;
+    while flr.d <> nil do
+    begin
+        if (x = flr.d^.x) and (y = flr.d^.y) then
+        begin
+            whatXY := '+';
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
+    whatXY := #0;
+end;
+
 function isCharacter(c: character; x, y: integer): boolean;
 begin
     if (x = c.x) and (y = c.y) then
@@ -648,21 +680,104 @@ begin
     write(f.class, ' attacked. Damage ', dmg);
 end;
 
-procedure showF(f: freak);
+function canFMove(flr: floor; c: character; all: pfreak; f: freak; ch: char)
+                                                                    : boolean;
 begin
-    GotoXY(f.x, f.y);
-    write(f.s);
+    case ch of      { count x, y }
+        'w': f.y -= 1;
+        'a': f.x -= 1;
+        's': f.y += 1;
+        'd': f.x += 1;
+    end;
+    while all <> nil do          { Check freaks }
+    begin
+        if (f.x = all^.x) and (f.y = all^.y) then
+        begin
+            CanFMove := false;
+            exit;
+        end;
+        all := all^.next;
+    end;
+    while flr.p <> nil do       { Check path }
+    begin
+        if (f.x = flr.p^.x) and (f.y = flr.p^.y) then
+        begin
+            CanFMove := true;
+            exit;
+        end;
+        flr.p := flr.p^.next;
+    end;
+    while flr.g <> nil do       { Check ground }
+    begin
+        if (f.x = flr.g^.x) and (f.y = flr.g^.y) then
+        begin
+            CanFMove := true;
+            exit;
+        end;
+        flr.g := flr.g^.next;
+    end;
+    while flr.d <> nil do       { Check door }
+    begin
+        if (f.x = flr.d^.x) and (f.y = flr.d^.y) then
+        begin
+            CanFMove := true;
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
+    canFMove := false;
 end;
 
-procedure hideF(f: freak);
+procedure moveF(flr: floor; c: character; all: pfreak; var f: freak);
+var
+    ch: char;
+    i, j, x, y, chance: integer;
+    found: boolean;
 begin
-    GotoXY(f.x, f.y);
-    write(' ');
-end;
+    chance := random(25) + 1;   { chance for miss move }
+    if chance = 1 then
+        exit;
 
-procedure moveF(flr: floor; c: character; var f: freak);    { todo }
-begin
-
+    found := false;
+    x := f.x - 5;
+    y := f.y - 5;
+    for i := 0 to 10 do
+        for j := 0 to 10 do
+            if isCharacter(c, x + j, y + i) then
+                found := true;
+    if found then
+    begin
+        case random(2) of
+        0:
+            if f.y <> c.y then
+                if f.y > c.y then
+                    ch := 'w'
+                else
+                    ch := 's';
+        1:
+            if f.x <> c.x then
+                if f.x > c.x then
+                    ch := 'a'
+                else
+                    ch := 'd';
+        end;
+    end
+    else
+    begin
+        case random(4) of
+            0: ch := 'w';
+            1: ch := 'a';
+            2: ch := 's';
+            3: ch := 'd';
+        end;
+    end;
+    if canFMove(flr, c, all, f, ch) then
+        case ch of
+            'w': f.y -= 1;
+            'a': f.x -= 1;
+            's': f.y += 1;
+            'd': f.x += 1;
+        end;
 end;
 
 procedure combatF(flr: floor; var c: character; f: freak);
@@ -702,7 +817,7 @@ begin
         if found then
             combatF(flr, c, tmpf^)
         else
-            moveF(flr, c, tmpf^);
+            moveF(flr, c, f, tmpf^);
         tmpf := tmpf^.next;
     end;
 end;
@@ -756,58 +871,26 @@ begin
     canIMove := false;
 end;
 
-function whereAmI(flr: floor; c: character): char;
-begin
-    while flr.p <> nil do
-    begin
-        if (c.x = flr.p^.x) and (c.y = flr.p^.y) then
-        begin
-            whereAmI := '#';
-            exit;
-        end;
-        flr.p := flr.p^.next;
-    end;
-    while flr.g <> nil do
-    begin
-        if (c.x = flr.g^.x) and (c.y = flr.g^.y) then
-        begin
-            whereAmI := '.';
-            exit;
-        end;
-        flr.g := flr.g^.next;
-    end;
-    while flr.d <> nil do
-    begin
-        if (c.x = flr.d^.x) and (c.y = flr.d^.y) then
-        begin
-            whereAmI := '+';
-            exit;
-        end;
-        flr.d := flr.d^.next;
-    end;
-    WhereAmI := #0;
-end;
-
 procedure showC(c: character);
 begin
     GotoXY(c.x, c.y);
     write(c.s);
 end;
 
-procedure hideC(c: character; loc: char);
+procedure hideC(flr: floor; c: character);
+var
+    loc: char;
 begin
+    loc := whatXY(flr, c.x, c.y);
     GotoXY(c.x, c.y);
     write(loc);
 end;
 
 procedure moveC(flr: floor; var c: character; f: pfreak; ch: char);
-var
-    loc: char;      { Location }
 begin
     if not canIMove(flr, c, f, ch) then
         exit;
-    loc := whereAmI(flr, c);
-    hideC(c, loc);
+    hideC(flr, c);
     case ch of
         'w', 'W': c.y -= 1;
         'a', 'A': c.x -= 1;

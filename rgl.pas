@@ -59,6 +59,7 @@ type
         s: char;
         class: freakClass;
         hp: integer;
+        melee: integer;
         next: ^freak;
     end;
 
@@ -73,6 +74,16 @@ begin
         clrscr;
         halt(1);
     end;
+end;
+
+procedure gameOver();
+begin
+    clrscr;
+    GotoXY((ScreenWidth - 9) div 2, ScreenHeight div 2);
+    write('Game Over');
+    delay(2000);
+    clrscr;
+    halt(1);
 end;
 
 { MAP }
@@ -95,7 +106,7 @@ begin
     if not DFE('map.txt') then
         halt(1);
 
-    y := 1;
+    y := 2;
     first := nil;
     p := nil;
     g := nil;
@@ -126,6 +137,7 @@ begin
                 begin
                     c.x := x;
                     c.y := y;
+                    c.s := last^.data[x];
                     new(tp);
                     tp^.next := p;
                     tp^.x := x;
@@ -187,6 +199,7 @@ begin
                     tf^.x := x;
                     tf^.y := y;
                     tf^.hp := 10;
+                    tf^.melee := 6;
                     tf^.s := last^.data[x];
                     last^.data[x] := ' ';
                     case tf^.s of
@@ -230,7 +243,7 @@ var
     tm: pmap;
     y: integer;
 begin
-    y := 1;
+    y := 2;
     while m <> nil do
     begin
         GotoXY(1, y);
@@ -263,9 +276,8 @@ procedure init(
                var f: pfreak);
 begin
     parseMap(m, flr, c, f);
-    c.s := '@';
     c.hp := 100;
-    c.melee := 4;
+    c.melee := 5;
     c.range := 7;
     TextColor(yellow);
     randomize;
@@ -273,6 +285,14 @@ end;
 { /Init }
 
 { FOV }
+function isCharacter(c: character; x, y: integer): boolean;
+begin
+    if (x = c.x) and (y = c.y) then
+        isCharacter := true
+    else
+        isCharacter := false;
+end;
+
 function isPath(flr: floor; x, y: integer): boolean;
 begin
     while flr.p <> nil do
@@ -459,17 +479,20 @@ begin
     isFreak := false;
 end;
 
-function findFreak(f: pfreak; x, y: integer; var res: pfreak): boolean;
+function findFreak(var f: pfreak; x, y: integer; var res: pfreak): boolean;
+var
+    tmp: pfreak;
 begin
-    while f <> nil do
+    tmp := f;
+    while tmp <> nil do
     begin
-        if (x = f^.x) and (y = f^.y) then
+        if (x = tmp^.x) and (y = tmp^.y) then
         begin
             findFreak := true;
-            res := f;
+            res := tmp;
             exit;
         end;
-        f := f^.next;
+        tmp := tmp^.next;
     end;
     findFreak := false;
     res := nil;
@@ -651,6 +674,77 @@ procedure deadMsgF(t: pfreak);
 begin
     GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
     write(t^.class, ' is dead');
+    delay(1000);
+end;
+
+procedure hitMsgF(dmg: integer; f: freak);
+begin
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+    if dmg <= 0 then
+    begin
+        write(f.class, ' didn`t hit');
+        exit;
+    end;
+    write(f.class, ' attacked. Damage ', dmg);
+end;
+
+procedure showF(f: freak);
+begin
+    GotoXY(f.x, f.y);
+    write(f.s);
+end;
+
+procedure hideF(f: freak);
+begin
+    GotoXY(f.x, f.y);
+    write(' ');
+end;
+
+procedure moveF(flr: floor; c: character; var f: freak);    { todo }
+begin
+
+end;
+
+procedure combatF(flr: floor; var c: character; f: freak);
+var
+    chance, dmg: integer;
+begin
+    chance := random(25) + 1;    { chance for miss hit }
+    if chance = 1 then
+    begin
+        hitMsgF(0, f);
+        exit;
+    end;
+
+    dmg := f.melee - random(f.melee div 2);   { random damage }
+    c.hp -= dmg;
+    hitMsgF(dmg, f);
+    if c.hp <= 0 then
+        gameOver();
+end;
+
+procedure actionFreak(flr: floor; var c: character; var f: pfreak);
+var
+    tmpf: pfreak;
+    i, j, x, y: integer;
+    found: boolean;
+begin
+    tmpf := f;
+    while tmpf <> nil do
+    begin
+        found := false;
+        x := tmpf^.x - 1;
+        y := tmpf^.y - 1;
+        for i := 0 to 2 do
+            for j := 0 to 2 do
+                if isCharacter(c, x + j, y + i) then
+                    found := true;
+        if found then
+            combatF(flr, c, tmpf^)
+        else
+            moveF(flr, c, tmpf^);
+        tmpf := tmpf^.next;
+    end;
 end;
 { /Freak } 
 
@@ -775,13 +869,28 @@ begin
         'm': write('You attacked. Damage ', dmg);
         'r': write('You fired. Damage ', dmg);
     end;
+    delay(1000);
+end;
+
+procedure showParam(c: character);
+var
+    i: integer;
+begin
+    for i := 1 to ScreenWidth do
+    begin
+        GotoXY(i, 1);
+        write(' ');
+    end;
+    GotoXY(10, 1);
+    write('hp: ', c.hp);
+    write('     melee: ', c.melee);
+    write('     range: ', c.range);
 end;
 
 procedure meleeC(c: character; var f: pfreak);
 var
-    p: ppath;
-    t: pfreak;     { target freak } 
-    i, j, chance, dmg: integer;
+    t, tmp: pfreak;     { target freak } 
+    i, j, x, y, chance, dmg: integer;
 begin
     chance := random(25) + 1;    { chance for miss hit }
     if chance = 1 then
@@ -790,19 +899,13 @@ begin
         exit;
     end;
 
-    p := nil;
-    c.x -= 1;
-    c.y -= 1;
+    t := nil;
+    x := c.x - 1;
+    y := c.y - 1;
     for i := 0 to 2 do
         for j := 0 to 2 do
-            addPath(p, c.x + j, c.y + i);
-    t := nil;
-    while p <> nil do
-    begin
-        if findFreak(f, p^.x, p^.y, t) then
-            break;
-        p := p^.next;
-    end;
+            if findFreak(f, x + j, y + i, tmp) then
+                t := tmp;
     if t = nil then     { if haven`t got target } 
     begin
         hitMsgC(0, 'm');
@@ -820,8 +923,7 @@ end;
 
 procedure rangeC(flr: floor; c: character; var f: pfreak);
 var
-    p: ppath;
-    t: pfreak;     { target freak } 
+    t, tmp: pfreak;     { target freak } 
     i, j, x, y, chance, dmg: integer;
 begin
     chance := random(25) + 1;    { chance for miss hit }
@@ -831,37 +933,41 @@ begin
         exit;
     end;
 
-    p := nil;
+    t := nil;
     x := c.x;           
     y := c.y;
-    for i := 1 to 3 do     { vertical }
-        if not isWall(flr, x, y + i) then
-            addPath(p, x, y + i)
-        else
-            break;
-    for i := 1 to 3 do
+    for i := 1 to 4 do     { vertical }
         if not isWall(flr, x, y - i) then
-            addPath(p, x, y - i)
+        begin
+            if findFreak(f, x, y - i, tmp) and (t = nil) then
+                t := tmp;
+        end
         else
             break;
-    for j := 1 to 3 do      { horizontal }
+    for i := 1 to 4 do
+        if not isWall(flr, x, y + i) then
+        begin
+            if findFreak(f, x, y + i, tmp) and (t = nil) then
+                t := tmp;
+        end
+        else
+            break;
+    for j := 1 to 4 do      { horizontal }
         if not isWall(flr, x + j, y) then
-            addPath(p, x + j, y)
+        begin
+            if findFreak(f, x + j, y, tmp) and (t = nil) then
+                t := tmp;
+        end
         else
             break;
-    for j := 1 to 3 do
+    for j := 1 to 4 do
         if not isWall(flr, x - j, y) then
-            addPath(p, x - j, y)
+        begin
+            if findFreak(f, x - j, y, tmp) and (t = nil) then
+                t := tmp;
+        end
         else
             break;
-    reversePath(p);
-    t := nil;           { find target }
-    while p <> nil do
-    begin
-        if findFreak(f, p^.x, p^.y, t) then
-            break;
-        p := p^.next;
-    end;
     if t = nil then     { if haven`t got target } 
     begin
         hitMsgC(0, 'r');
@@ -905,12 +1011,15 @@ begin
     init(m, flr, c, f);
     showMap(m);
     checkFov(flr, c, f);
+    showParam(c);
     while true do
     begin
         if KeyPressed then
         begin
             clearHappen();
             handleKey(flr, c, f);
+            actionFreak(flr, c, f);
+            showParam(c);
             checkFov(flr, c, f);
         end;
     end;

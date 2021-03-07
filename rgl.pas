@@ -293,6 +293,40 @@ begin
         isCharacter := false;
 end;
 
+function isFreak(f: pfreak; x, y: integer; var ch: char): boolean;
+begin
+    while f <> nil do
+    begin
+        if (x = f^.x) and (y = f^.y) then
+        begin
+            isFreak := true;
+            ch := f^.s;
+            exit;
+        end;
+        f := f^.next;
+    end;
+    isFreak := false;
+end;
+
+function findFreak(var f: pfreak; x, y: integer; var res: pfreak): boolean;
+var
+    tmp: pfreak;
+begin
+    tmp := f;
+    while tmp <> nil do
+    begin
+        if (x = tmp^.x) and (y = tmp^.y) then
+        begin
+            findFreak := true;
+            res := tmp;
+            exit;
+        end;
+        tmp := tmp^.next;
+    end;
+    findFreak := false;
+    res := nil;
+end;
+
 function isPath(flr: floor; x, y: integer): boolean;
 begin
     while flr.p <> nil do
@@ -307,34 +341,29 @@ begin
     isPath := false;
 end;
 
-procedure addPath(var p: ppath; x, y: integer);
+procedure showPath(flr: floor; c: character; f: pfreak);
 var
-    tp: ppath;
+    ch: char;
+    i, j, x, y: integer;
 begin
-    new(tp);
-    tp^.next := p;
-    tp^.x := x;
-    tp^.y := y;
-    p := tp;
-end;
-
-procedure reversePath(var p: ppath);
-var
-    tp, rp: ppath;
-begin
-    rp := nil;
-    while p <> nil do
-    begin
-        new(tp);
-        tp^.next := rp;
-        tp^.x := p^.x;
-        tp^.y := p^.y;
-        rp := tp;
-        tp := p;
-        p := p^.next;
-        dispose(tp);
-    end;
-    p := rp;
+    x := c.x - 1;
+    y := c.y - 1;
+    for i := 0 to 2 do
+        for j := 0 to 2 do
+            if isPath(flr, x + j, y + i) then
+            begin
+                GotoXY(x + j, y + i);
+                write('#');
+            end;
+    for i := 0 to 2 do
+        for j := 0 to 2 do
+            if isFreak(f, x + j, y + i, ch) then
+            begin
+                GotoXY(x + j, y + i);
+                write(ch);
+            end;
+    GotoXY(c.x, c.y);
+    write(c.s);
 end;
 
 function isGround(flr: floor; x, y: integer): boolean;
@@ -461,75 +490,6 @@ begin
             x += 1;
         end;
         y += 1;
-    end;
-end;
-
-function isFreak(f: pfreak; x, y: integer; var ch: char): boolean;
-begin
-    while f <> nil do
-    begin
-        if (x = f^.x) and (y = f^.y) then
-        begin
-            isFreak := true;
-            ch := f^.s;
-            exit;
-        end;
-        f := f^.next;
-    end;
-    isFreak := false;
-end;
-
-function findFreak(var f: pfreak; x, y: integer; var res: pfreak): boolean;
-var
-    tmp: pfreak;
-begin
-    tmp := f;
-    while tmp <> nil do
-    begin
-        if (x = tmp^.x) and (y = tmp^.y) then
-        begin
-            findFreak := true;
-            res := tmp;
-            exit;
-        end;
-        tmp := tmp^.next;
-    end;
-    findFreak := false;
-    res := nil;
-end;
-
-procedure showPath(flr: floor; c: character; f: pfreak);
-var
-    tp, p: ppath;
-    ch: char;
-    i, j: integer;
-begin
-    p := nil;
-    c.x -= 1;
-    c.y -= 1;
-    for i := 0 to 2 do
-        for j := 0 to 2 do
-            if not ((i = 1) and (j = 1)) then
-                addPath(p, c.x + j, c.y + i);
-    tp := p;
-    while tp <> nil do
-    begin
-        if isPath(flr, tp^.x, tp^.y) then
-        begin
-            GotoXY(tp^.x, tp^.y);
-            write('#');
-        end;
-        tp := tp^.next;
-    end;
-    tp := p;
-    while tp <> nil do
-    begin
-        if isFreak(f, tp^.x, tp^.y, ch) then
-        begin
-            GotoXY(tp^.x, tp^.y);
-            write(ch);
-        end;
-        tp := tp^.next;
     end;
 end;
 
@@ -991,11 +951,7 @@ begin
         'w','W','a','A','s','S','d','D': moveC(flr, c, f, ch);
         'e', 'E': meleeC(c, f);
         'q', 'Q': rangeC(flr, c, f);
-        #27:
-        begin 
-            clrscr;
-            halt;
-        end;
+        #27: gameOver();
     end;
 end;
 { /Character }

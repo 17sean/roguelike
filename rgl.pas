@@ -45,11 +45,22 @@ type
         b: pbuilding;
     end;
 
+    pitem = ^item;
+    item = record
+        idx: integer;
+        name: string;
+        dmg: integer;
+        strength: integer;
+        next: ^item;
+    end;
+
     character = record
+        stage: integer;
         x, y: integer;
-        s: char;    { Symbol }
+        s: char;
         hp: integer;
-        melee, range: integer;
+        dmg: integer;
+        melee, range: item;
     end;
 
     freakClass = (Demented, Hunter);
@@ -59,7 +70,7 @@ type
         s: char;
         class: freakClass;
         hp: integer;
-        melee: integer;
+        dmg: integer;
         next: ^freak;
     end;
 
@@ -81,12 +92,78 @@ begin
     clrscr;
     GotoXY((ScreenWidth - 9) div 2, ScreenHeight div 2);
     write('Game Over');
-    delay(2000);
+    delay(500);
     clrscr;
     halt(1);
 end;
 
 { MAP }
+procedure showMap(var m: pmap);
+var
+    tm: pmap;
+    y: integer;
+begin
+    y := 2;
+    while m <> nil do
+    begin
+        GotoXY(1, y);
+        write(m^.data);
+        tm := m;
+        m := m^.next;
+        dispose(tm);
+        y += 1;
+    end;
+end;
+
+procedure clearHappen();
+var
+    i: integer;
+begin
+    GotoXY(1, ScreenHeight - 2);    { clear }
+    for i := 1 to ScreenWidth do
+        write(' ');
+    GotoXY(1, ScreenHeight - 1);
+    for i := 1 to ScreenWidth do
+        write(' ');
+end;
+{ /MAP }
+
+{ Items }
+function getItemByIdx(itm: pitem; idx: integer): item;
+begin
+    while itm <> nil do
+    begin
+        if (idx = itm^.idx) then
+        begin
+            getItemByIdx := itm^;
+            exit;
+        end;
+        itm := itm^.next;
+    end;
+end;
+
+procedure loadMelee(itm: pitem; var c: character; idx: integer);
+begin
+    c.melee := getItemByIdx(itm, idx);
+end;
+
+procedure loadRange(itm: pitem; var c: character; idx: integer);
+begin
+    c.range := getItemByIdx(itm, idx);
+end;
+
+procedure unloadMelee(itm: pitem; var c: character);
+begin
+    c.melee := getItemByIdx(itm, 0);
+end;
+
+procedure unloadRange(itm: pitem; var c: character);
+begin
+    c.range := getItemByIdx(itm, 0);
+end;
+{ /Items }
+
+{ Parsers }
 procedure parseMap(
                    var first: pmap;
                    var flr: floor;
@@ -199,7 +276,7 @@ begin
                     tf^.x := x;
                     tf^.y := y;
                     tf^.hp := 10;
-                    tf^.melee := 6;
+                    tf^.dmg := 10;
                     tf^.s := last^.data[x];
                     last^.data[x] := ' ';
                     case tf^.s of
@@ -238,47 +315,83 @@ begin
     flr.b := b;
 end;
 
-procedure showMap(var m: pmap);
+procedure parseItems(var itm: pitem);
 var
-    tm: pmap;
-    y: integer;
+    ifile: text;
+    titm: pitem;
+    s: string;
 begin
-    y := 2;
-    while m <> nil do
+    assign(ifile, 'items.txt');
+    reset(ifile);
+    itm := nil;
+    while not EOF(ifile) do
     begin
-        GotoXY(1, y);
-        write(m^.data);
-        tm := m;
-        m := m^.next;
-        dispose(tm);
-        y += 1;
+        readln(ifile, s);
+        case s[1] of
+            '~':
+            begin
+                new(titm);
+                titm^.next := itm;
+            end;
+            '#': itm := titm;
+            'I': titm^.idx := SrI(ParserShorter(s));
+            'N': titm^.name := ParserShorter(s);
+            'D': titm^.dmg := SrI(ParserShorter(s));
+            'S': titm^.strength := SrI(ParserShorter(s));
+        end;
     end;
+    close(ifile);
 end;
 
-procedure clearHappen();
+procedure createSave();
 var
-    i: integer;
+    sfile: text;
 begin
-    GotoXY(1, ScreenHeight - 2);    { clear }
-    for i := 1 to ScreenWidth do
-        write(' ');
-    GotoXY(1, ScreenHeight - 1);
-    for i := 1 to ScreenWidth do
-        write(' ');
+    assign(sfile, 'save.txt');
+    rewrite(sfile);
+    writeln(sfile, 'S:1;');
+    writeln(sfile, 'H:100;');
+    writeln(sfile, 'D:2;');
+    writeln(sfile, 'M:0;');
+    writeln(sfile, 'R:0;');
+    close(sfile);
 end;
-{ /MAP }
+
+procedure parseSave(itm: pitem; var c: character);
+var
+    sfile: text;
+    s: string;
+begin
+    if not DFE('save.txt') then
+        createSave();
+    assign(sfile, 'save.txt');
+    reset(sfile);
+    while not EOF(sfile) do
+    begin
+        readln(sfile, s);
+        case s[1] of
+            'S': c.stage := SrI(ParserShorter(s));
+            'H': c.hp := SrI(ParserShorter(s));
+            'D': c.dmg := SrI(ParserShorter(s));
+            'M': loadMelee(itm, c, SrI(ParserShorter(s)));
+            'R': loadRange(itm, c, SrI(ParserShorter(s)));
+        end;
+    end;
+    close(sfile);
+end;
+{ /Parsers }
 
 { Init }
 procedure init(
                var m: pmap;
                var flr: floor;
+               var itm: pitem;
                var c: character;
                var f: pfreak);
 begin
     parseMap(m, flr, c, f);
-    c.hp := 100;
-    c.melee := 5;
-    c.range := 7;
+    parseItems(itm);
+    parseSave(itm, c);
     TextColor(yellow);
     randomize;
 end;
@@ -650,23 +763,42 @@ begin
 end;
 { /FOV }
 
-{ Freak }
-procedure removeF(var f, t: pfreak);
-var
-    pp: ^pfreak;
+{ Messages }
+procedure hitMsgC(dmg: integer; ch: char);
 begin
-    pp := @f;
-    while pp^ <> t do
-        pp := @(pp^^.next);
-    pp^ := pp^^.next;
-    dispose(t);
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+    if dmg <= 0 then
+    begin
+        write('You didn`t hit');
+        delay(1000);
+        exit;
+    end;
+    case ch of
+        'm': write('You attacked. Damage ', dmg);
+        'r': write('You fired. Damage ', dmg);
+    end;
+    delay(1000);
 end;
 
-procedure deadMsgF(t: pfreak);
+procedure deadMsgC(f: freak);
 begin
-    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
-    write(t^.class, ' is dead');
-    delay(1000);
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+    write('You died by ', f.class);
+    delay(2000);
+end;
+
+procedure noGunMsgC();
+begin
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+    write('You haven''t any gun');
+    delay(2000);
+end;
+
+procedure brokenGunMsgC();
+begin
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+    write('Your weapon is broken');
+    delay(2000);
 end;
 
 procedure hitMsgF(dmg: integer; f: freak);
@@ -678,6 +810,27 @@ begin
         exit;
     end;
     write(f.class, ' attacked. Damage ', dmg);
+    delay(1000);
+end;
+
+procedure deadMsgF(t: pfreak);
+begin
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
+    write(t^.class, ' is dead');
+    delay(1000);
+end;
+{ /Messages }
+
+{ Freak }
+procedure removeF(var f, t: pfreak);
+var
+    pp: ^pfreak;
+begin
+    pp := @f;
+    while pp^ <> t do
+        pp := @(pp^^.next);
+    pp^ := pp^^.next;
+    dispose(t);
 end;
 
 function canFMove(flr: floor; c: character; all: pfreak; f: freak; ch: char)
@@ -748,18 +901,18 @@ begin
     if found then
     begin
         case random(2) of
-        0:
-            if f.y <> c.y then
-                if f.y > c.y then
-                    ch := 'w'
-                else
-                    ch := 's';
-        1:
-            if f.x <> c.x then
-                if f.x > c.x then
-                    ch := 'a'
-                else
-                    ch := 'd';
+            0:
+                if f.y <> c.y then
+                    if f.y > c.y then
+                        ch := 'w'
+                    else
+                        ch := 's';
+            1:
+                if f.x <> c.x then
+                    if f.x > c.x then
+                        ch := 'a'
+                    else
+                        ch := 'd';
         end;
     end
     else
@@ -791,11 +944,14 @@ begin
         exit;
     end;
 
-    dmg := f.melee - random(f.melee div 2);   { random damage }
+    dmg := f.dmg - random(f.dmg div 2);   { random damage }
     c.hp -= dmg;
     hitMsgF(dmg, f);
     if c.hp <= 0 then
+    begin
+        deadMsgC(f);
         gameOver();
+    end;
 end;
 
 procedure actionFreak(flr: floor; var c: character; var f: pfreak);
@@ -900,21 +1056,6 @@ begin
     showC(c);
 end;
 
-procedure hitMsgC(dmg: integer; ch: char);
-begin
-    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
-    if dmg <= 0 then
-    begin
-        write('You didn`t hit');
-        exit;
-    end;
-    case ch of
-        'm': write('You attacked. Damage ', dmg);
-        'r': write('You fired. Damage ', dmg);
-    end;
-    delay(1000);
-end;
-
 procedure showParam(c: character);
 var
     i: integer;
@@ -925,16 +1066,23 @@ begin
         write(' ');
     end;
     GotoXY(10, 1);
-    write('hp: ', c.hp);
-    write('     melee: ', c.melee);
-    write('     range: ', c.range);
+    write('HP: ', c.hp);
+    write('   M: ', c.melee.dmg);
+    write('   R: ', c.range.dmg);
+    write('   MS: ', c.melee.strength);
+    write('   RS: ', c.range.strength);
 end;
 
-procedure meleeC(c: character; var f: pfreak);
+procedure meleeC(itm: pitem; var c: character; var f: pfreak);
 var
     t, tmp: pfreak;     { target freak } 
     i, j, x, y, chance, dmg: integer;
 begin
+    if (c.melee.strength <= 0) and (c.melee.idx <> 0) then
+        unloadMelee(itm, c);
+    if c.melee.strength <> 0 then
+        c.melee.strength -= 1;
+
     chance := random(25) + 1;    { chance for miss hit }
     if chance = 1 then
     begin
@@ -954,7 +1102,7 @@ begin
         hitMsgC(0, 'm');
         exit;
     end;
-    dmg := c.melee - random(c.melee div 2);   { random damage } 
+    dmg := c.dmg + c.melee.dmg - random(c.melee.dmg div 2);   { random damage } 
     t^.hp -= dmg;
     hitMsgC(dmg, 'm');
     if t^.hp <= 0 then
@@ -964,11 +1112,25 @@ begin
     end;
 end;
 
-procedure rangeC(flr: floor; c: character; var f: pfreak);
+procedure rangeC(flr: floor; itm: pitem; var c: character; var f: pfreak);
 var
     t, tmp: pfreak;     { target freak } 
     i, j, x, y, chance, dmg: integer;
 begin
+    if (c.range.idx = 0) then
+    begin
+        noGunMsgC();
+        exit;
+    end;
+    if (c.range.strength <= 0) and (c.range.idx <> 0) then
+    begin
+        unloadRange(itm, c);
+        brokenGunMsgC();
+        exit;
+    end;
+    if c.range.strength <> 0 then
+        c.range.strength -= 1;
+
     chance := random(25) + 1;    { chance for miss hit }
     if chance = 1 then
     begin
@@ -977,6 +1139,12 @@ begin
     end;
 
     t := nil;
+    x := c.x - 1;           
+    y := c.y - 1;
+    for i := 0 to 2 do     { if near the player }
+        for j := 0 to 2 do
+            if findFreak(f, x + j, y + i, tmp) then
+                t := tmp;
     x := c.x;           
     y := c.y;
     for i := 1 to 4 do     { vertical }
@@ -1016,7 +1184,7 @@ begin
         hitMsgC(0, 'r');
         exit;
     end;
-    dmg := c.range - random(c.range div 2);   { random damage } 
+    dmg := c.range.dmg - random(c.range.dmg div 2);   { random damage } 
     t^.hp -= dmg;
     hitMsgC(dmg, 'r');
     if t^.hp <= 0 then
@@ -1025,15 +1193,15 @@ begin
         removeF(f, t);
     end;
 end;
-procedure handleKey(flr: floor; var c: character; var f: pfreak);
+procedure handleKey(flr: floor; itm: pitem; var c: character; var f: pfreak);
 var
     ch: char;
 begin
     ch := ReadKey;
     case ch of
         'w','W','a','A','s','S','d','D': moveC(flr, c, f, ch);
-        'e', 'E': meleeC(c, f);
-        'q', 'Q': rangeC(flr, c, f);
+        'e', 'E': meleeC(itm, c, f);
+        'q', 'Q': rangeC(flr, itm, c, f);
         #27: gameOver();
     end;
 end;
@@ -1042,12 +1210,13 @@ end;
 var
     m: pmap;
     flr: floor;
+    itm: pitem;
     c: character;
     f: pfreak;
 begin
-    screenCheck();
     clrscr;
-    init(m, flr, c, f);
+    screenCheck();
+    init(m, flr, itm, c, f);
     showMap(m);
     checkFov(flr, c, f);
     showParam(c);
@@ -1056,7 +1225,8 @@ begin
         if KeyPressed then
         begin
             clearHappen();
-            handleKey(flr, c, f);
+            handleKey(flr, itm, c, f);
+            clearHappen();
             actionFreak(flr, c, f);
             showParam(c);
             checkFov(flr, c, f);

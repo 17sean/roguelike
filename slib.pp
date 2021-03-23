@@ -13,14 +13,22 @@ function SrI(s: string): longint;
 var
     i: integer;
     res: longint;
+    negative: boolean;
 begin
-    i := 1;
     res := 0;
+    negative := false;
     for i := 1 to length(s) do
     begin
-        res *= 10;
-        res += ord(s[i]) - ord('0');
+        if (i = 1) and (s[1] = '-') then
+            negative := true
+        else
+        begin
+            res *= 10;
+            res += ord(s[i]) - ord('0');
+        end;
     end;
+    if negative then
+        res *= -1;
     SrI := res;
 end;
 
@@ -85,8 +93,6 @@ begin
     begin
         DFE := true;
         close(f);
-        {$I+}
-        exit;
     end
     else
         DFE := false;
@@ -96,11 +102,13 @@ end;
 function StringShorter(s: string; pos: integer): string;
 var
     tmp: string;
-    i: integer;
 begin
     tmp := '';
-    for i := pos to length(s) do
-        tmp += s[i];
+    while s[pos] <> ';' do
+    begin
+        tmp += s[pos];
+        pos += 1;
+    end;
     StringShorter := tmp;
 end;
 

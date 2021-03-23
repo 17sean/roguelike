@@ -1,0 +1,25 @@
+\\  I - index    N - name   D - dmg   A - ammo type
+~
+I:0;
+N:none;
+D:0;
+A:none;
+#
+~
+I:1;
+N:Bat;
+D:5;
+S:3;
+#
+~
+I:2;
+N:Berret 92;
+D:4;
+S:100;
+#
+~
+I:3;
+N:M4A1;
+D:9;
+S:5;
+#

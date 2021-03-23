@@ -117,14 +117,14 @@ end;
 
 procedure clearHappen();
 var
-    i: integer;
+    i, j: integer;
 begin
-    GotoXY(1, ScreenHeight - 2);    { clear }
-    for i := 1 to ScreenWidth do
-        write(' ');
-    GotoXY(1, ScreenHeight - 1);
-    for i := 1 to ScreenWidth do
-        write(' ');
+    for i := 1 to 2 do
+    begin
+        GotoXY(1, ScreenHeight - i);
+        for j := 1 to ScreenWidth do
+            write(' ');
+    end;
 end;
 { /MAP }
 
@@ -782,21 +782,21 @@ end;
 
 procedure deadMsgC(f: freak);
 begin
-    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
     write('You died by ', f.class);
     delay(2000);
 end;
 
 procedure noGunMsgC();
 begin
-    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
     write('You haven''t any gun');
     delay(2000);
 end;
 
 procedure brokenGunMsgC();
 begin
-    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+    GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
     write('Your weapon is broken');
     delay(2000);
 end;
@@ -1079,7 +1079,10 @@ var
     i, j, x, y, chance, dmg: integer;
 begin
     if (c.melee.strength <= 0) and (c.melee.idx <> 0) then
+    begin
         unloadMelee(itm, c);
+        brokenGunMsgC();
+    end;
     if c.melee.strength <> 0 then
         c.melee.strength -= 1;
 

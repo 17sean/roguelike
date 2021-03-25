@@ -50,6 +50,7 @@ type
         idx: integer;
         name: string;
         dmg: integer;
+        dist: integer;
         strength: integer;
         next: ^item;
     end;
@@ -337,6 +338,7 @@ begin
             'I': titm^.idx := SrI(ParserShorter(s));
             'N': titm^.name := ParserShorter(s);
             'D': titm^.dmg := SrI(ParserShorter(s));
+            'Z': titm^.dist := SrI(ParserShorter(s));
             'S': titm^.strength := SrI(ParserShorter(s));
         end;
     end;
@@ -1063,14 +1065,14 @@ begin
         GotoXY(i, 1);
         write(' ');
     end;
-    GotoXY(10, 1);
+    GotoXY(5, 1);
     write('HP: ', c.hp);
     write('   M: ', c.melee.dmg + c.dmg);
     write(' S: ', c.melee.strength);
     write('   R: ', c.range.dmg);
     write(' S: ', c.range.strength);
-    write('     Inv: ', c.melee.name);
-    write(' ', c.range.name);
+    write('       Inv: ', c.melee.name);
+    write(' and ', c.range.name);
 end;
 
 procedure meleeC(itm: pitem; var c: character; var f: pfreak);
@@ -1146,7 +1148,7 @@ begin
                 t := tmp;
     x := c.x;           
     y := c.y;
-    for i := 1 to 4 do     { vertical }
+    for i := 1 to c.range.dist do     { vertical }
         if not isWall(flr, x, y - i) then
         begin
             if findFreak(f, x, y - i, tmp) and (t = nil) then
@@ -1154,7 +1156,7 @@ begin
         end
         else
             break;
-    for i := 1 to 4 do
+    for i := 1 to c.range.dist do
         if not isWall(flr, x, y + i) then
         begin
             if findFreak(f, x, y + i, tmp) and (t = nil) then
@@ -1162,7 +1164,7 @@ begin
         end
         else
             break;
-    for j := 1 to 4 do      { horizontal }
+    for j := 1 to c.range.dist do      { horizontal }
         if not isWall(flr, x + j, y) then
         begin
             if findFreak(f, x + j, y, tmp) and (t = nil) then
@@ -1170,7 +1172,7 @@ begin
         end
         else
             break;
-    for j := 1 to 4 do
+    for j := 1 to c.range.dist do
         if not isWall(flr, x - j, y) then
         begin
             if findFreak(f, x - j, y, tmp) and (t = nil) then

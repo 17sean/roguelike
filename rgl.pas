@@ -884,11 +884,10 @@ end;
 procedure moveF(flr: floor; c: character; all: pfreak; var f: freak);
 var
     ch: char;
-    i, j, x, y, chance: integer;
+    i, j, x, y: integer;
     found: boolean;
 begin
-    chance := random(25) + 1;   { chance for miss move }
-    if chance = 1 then
+    if random(25) = 0 then   { chance for miss move }
         exit;
 
     found := false;
@@ -935,10 +934,9 @@ end;
 
 procedure combatF(flr: floor; var c: character; f: freak);
 var
-    chance, dmg: integer;
+    dmg: integer;
 begin
-    chance := random(25) + 1;    { chance for miss hit }
-    if chance = 1 then
+    if random(25) = 0 then    { chance for miss hit }
     begin
         hitMsgF(0, f);
         exit;
@@ -1078,7 +1076,7 @@ end;
 procedure meleeC(itm: pitem; var c: character; var f: pfreak);
 var
     t, tmp: pfreak;     { target freak } 
-    i, j, x, y, chance, dmg: integer;
+    i, j, x, y, dmg: integer;
 begin
     if (c.melee.strength <= 0) and (c.melee.idx <> 0) then
     begin
@@ -1087,9 +1085,7 @@ begin
     end;
     if c.melee.strength <> 0 then
         c.melee.strength -= 1;
-
-    chance := random(25) + 1;    { chance for miss hit }
-    if chance = 1 then
+    if random(25) = 0 then   { chance for miss hit }
     begin
         hitMsgC(0, 'm');
         exit;
@@ -1107,7 +1103,7 @@ begin
         hitMsgC(0, 'm');
         exit;
     end;
-    dmg := c.dmg + c.melee.dmg - random(c.melee.dmg div 2);   { random damage } 
+    dmg := c.dmg + c.melee.dmg - random(c.melee.dmg div 2);   { random damage }
     t^.hp -= dmg;
     hitMsgC(dmg, 'm');
     if t^.hp <= 0 then
@@ -1120,7 +1116,7 @@ end;
 procedure rangeC(flr: floor; itm: pitem; var c: character; var f: pfreak);
 var
     t, tmp: pfreak;     { target freak } 
-    i, j, x, y, chance, dmg: integer;
+    i, j, x, y, dmg: integer;
 begin
     if (c.range.idx = 0) then
     begin
@@ -1135,11 +1131,9 @@ begin
     end;
     if c.range.strength <> 0 then
         c.range.strength -= 1;
-
-    chance := random(25) + 1;    { chance for miss hit }
-    if chance = 1 then
+    if random(25) = 0 then   { chance for miss hit }
     begin
-        hitMsgC(0, 'r');
+        hitMsgC(0, 'm');
         exit;
     end;
 

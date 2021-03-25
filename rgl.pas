@@ -1067,10 +1067,12 @@ begin
     end;
     GotoXY(10, 1);
     write('HP: ', c.hp);
-    write('   M: ', c.melee.dmg);
+    write('   M: ', c.melee.dmg + c.dmg);
+    write(' S: ', c.melee.strength);
     write('   R: ', c.range.dmg);
-    write('   MS: ', c.melee.strength);
-    write('   RS: ', c.range.strength);
+    write(' S: ', c.range.strength);
+    write('     Inv: ', c.melee.name);
+    write(' ', c.range.name);
 end;
 
 procedure meleeC(itm: pitem; var c: character; var f: pfreak);

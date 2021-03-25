@@ -1,9 +1,9 @@
 \\  I - index    N - name   D - dmg   A - ammo type
 ~
 I:0;
-N:none;
+N:None;
 D:0;
-A:none;
+S:0;
 #
 ~
 I:1;

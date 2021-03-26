@@ -766,7 +766,7 @@ end;
 { /FOV }
 
 { Messages }
-procedure hitMsgC(dmg: integer; ch: char);
+procedure hitMsgC(dmg: integer; mr, nc: char);
 begin
     GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
     if dmg <= 0 then
@@ -775,7 +775,12 @@ begin
         delay(1000);
         exit;
     end;
-    case ch of
+    if nc = 'c' then
+    begin
+        write('Critical hit! Damage ', dmg);
+        exit;
+    end;
+    case mr of
         'm': write('You attacked. Damage ', dmg);
         'r': write('You fired. Damage ', dmg);
     end;
@@ -1079,6 +1084,7 @@ procedure meleeC(itm: pitem; var c: character; var f: pfreak);
 var
     t, tmp: pfreak;     { target freak } 
     i, j, x, y, dmg: integer;
+    nc: char;
 begin
     if (c.melee.strength <= 0) and (c.melee.idx <> 0) then
     begin
@@ -1089,7 +1095,7 @@ begin
         c.melee.strength -= 1;
     if random(25) = 0 then   { chance for miss hit }
     begin
-        hitMsgC(0, 'm');
+        hitMsgC(0, 'm', 'n');
         exit;
     end;
 
@@ -1102,12 +1108,19 @@ begin
                 t := tmp;
     if t = nil then     { if haven`t got target } 
     begin
-        hitMsgC(0, 'm');
+        hitMsgC(0, 'm', 'n');
         exit;
     end;
     dmg := c.dmg + c.melee.dmg - random(c.melee.dmg div 2);   { random damage }
+    if random(25) = 0 then   { critical hit }
+    begin
+        dmg *= 2;
+        nc := 'c';
+    end
+    else
+        nc := 'n';
     t^.hp -= dmg;
-    hitMsgC(dmg, 'm');
+    hitMsgC(dmg, 'm', nc);
     if t^.hp <= 0 then
     begin
         deadMsgF(t);
@@ -1119,6 +1132,7 @@ procedure rangeC(flr: floor; itm: pitem; var c: character; var f: pfreak);
 var
     t, tmp: pfreak;     { target freak } 
     i, j, x, y, dmg: integer;
+    nc: char;
 begin
     if (c.range.idx = 0) then
     begin
@@ -1135,7 +1149,7 @@ begin
         c.range.strength -= 1;
     if random(25) = 0 then   { chance for miss hit }
     begin
-        hitMsgC(0, 'm');
+        hitMsgC(0, 'r', 'n');
         exit;
     end;
 
@@ -1182,18 +1196,26 @@ begin
             break;
     if t = nil then     { if haven`t got target } 
     begin
-        hitMsgC(0, 'r');
+        hitMsgC(0, 'r', 'n');
         exit;
     end;
     dmg := c.range.dmg - random(c.range.dmg div 2);   { random damage } 
+    if random(25) = 0 then   { critical hit }
+    begin
+        dmg *= 2;
+        nc := 'c';
+    end
+    else
+        nc := 'n';
     t^.hp -= dmg;
-    hitMsgC(dmg, 'r');
+    hitMsgC(dmg, 'r', nc);
     if t^.hp <= 0 then
     begin
         deadMsgF(t);
         removeF(f, t);
     end;
 end;
+
 procedure handleKey(flr: floor; itm: pitem; var c: character; var f: pfreak);
 var
     ch: char;

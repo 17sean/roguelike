@@ -4,8 +4,9 @@ interface
 function SrI(s: string): longint; { String returns integer }
 function IrS(i: longint): string; { Integer returns string }
 function DFE(dir: string): boolean; { Does file exist? }
-function StringShorter(s: string; pos: integer): string;
-function ParserShorter(s: string): string;
+function StringShorter(src: string; pos: integer; stop: char): string;
+function ParseHeader(src: string): string;
+function ParseBody(src: string): string;
 
 implementation
 
@@ -99,27 +100,42 @@ begin
     {$I+}
 end;
 
-function StringShorter(s: string; pos: integer): string;
+function StringShorter(src: string; pos: integer; stop: char): string;
 var
-    tmp: string;
+    dst: string;
 begin
-    tmp := '';
-    while s[pos] <> ';' do
+    dst := '';
+    while src[pos] <> stop do
     begin
-        tmp += s[pos];
+        dst += src[pos];
         pos += 1;
     end;
-    StringShorter := tmp;
+    StringShorter := dst;
 end;
 
-function ParserShorter(s: string): string;
+function ParseHeader(src: string): string;
+begin
+    if src[1] = '*' then
+    begin
+        ParseHeader := '';
+        exit;
+    end;
+    if src[1] in ['~', '#'] then
+    begin
+        ParseHeader := src[1];
+        exit;
+    end;
+    ParseHeader := StringShorter(src, 1, ':');
+end;
+
+function ParseBody(src: string): string;
 var
     pos: integer;
 begin
     pos := 1;
-    while s[pos] <> ':' do
+    while src[pos] <> ':' do
         pos += 1;
-    ParserShorter := StringShorter(s, pos+1);
+    ParseBody := StringShorter(src, pos+1, ';');
 end;
 
 end.

@@ -37,14 +37,6 @@ type
         next: ^building;
     end;
 
-    floor = record
-        p: ppath;
-        g: pground;
-        d: pdoor;
-        w: pwall;
-        b: pbuilding;
-    end;
-
     pitem = ^item;
     item = record
         idx: integer;
@@ -55,11 +47,28 @@ type
         next: ^item;
     end;
 
+    shop = record
+        x, y: integer;
+        heal: integer;
+        gun: integer;
+        healcost, guncost: integer;
+    end;
+
+    floor = record
+        p: ppath;
+        g: pground;
+        d: pdoor;
+        w: pwall;
+        b: pbuilding;
+        s: shop;
+    end;
+
     character = record
         stage: integer;
         x, y: integer;
         s: char;
         hp: integer;
+        money: integer;
         dmg: integer;
         melee, range: item;
     end;
@@ -143,14 +152,12 @@ begin
     end;
 end;
 
-procedure loadMelee(itm: pitem; var c: character; idx: integer);
+procedure loadGun(itm: pitem; var c: character; idx: integer);
 begin
-    c.melee := getItemByIdx(itm, idx);
-end;
-
-procedure loadRange(itm: pitem; var c: character; idx: integer);
-begin
-    c.range := getItemByIdx(itm, idx);
+    if idx <= 3 then
+        c.melee := getItemByIdx(itm, idx)
+    else
+        c.range := getItemByIdx(itm, idx);
 end;
 
 procedure unloadMelee(itm: pitem; var c: character);
@@ -211,17 +218,6 @@ begin
         while last^.data[x] <> #0 do    { Check for floors }
         begin 
             case last^.data[x] of
-                '@':
-                begin
-                    c.x := x;
-                    c.y := y;
-                    c.s := last^.data[x];
-                    new(tp);
-                    tp^.next := p;
-                    tp^.x := x;
-                    tp^.y := y;
-                    p := tp;
-                end;
                 '#':
                 begin
                     last^.data[x] := ' ';
@@ -269,6 +265,23 @@ begin
                     tg^.x := x;
                     tg^.y := y;
                     g := tg;
+                end;
+                '$':
+                begin
+                    last^.data[x] := ' ';
+                    flr.s.x := x;
+                    flr.s.y := y;
+                end;
+                '@':
+                begin
+                    c.x := x;
+                    c.y := y;
+                    c.s := last^.data[x];
+                    new(tp);
+                    tp^.next := p;
+                    tp^.x := x;
+                    tp^.y := y;
+                    p := tp;
                 end;
                 'D', 'H':
                 begin
@@ -328,18 +341,18 @@ begin
     while not EOF(ifile) do
     begin
         readln(ifile, s);
-        case s[1] of
+        case ParseHeader(s) of
             '~':
             begin
                 new(titm);
                 titm^.next := itm;
             end;
             '#': itm := titm;
-            'I': titm^.idx := SrI(ParserShorter(s));
-            'N': titm^.name := ParserShorter(s);
-            'D': titm^.dmg := SrI(ParserShorter(s));
-            'Z': titm^.dist := SrI(ParserShorter(s));
-            'S': titm^.strength := SrI(ParserShorter(s));
+            'idx': titm^.idx := SrI(ParseBody(s));
+            'name': titm^.name := ParseBody(s);
+            'dmg': titm^.dmg := SrI(ParseBody(s));
+            'distance': titm^.dist := SrI(ParseBody(s));
+            'strength': titm^.strength := SrI(ParseBody(s));
         end;
     end;
     close(ifile);
@@ -351,11 +364,11 @@ var
 begin
     assign(sfile, 'save.txt');
     rewrite(sfile);
-    writeln(sfile, 'S:1;');
-    writeln(sfile, 'H:100;');
-    writeln(sfile, 'D:2;');
-    writeln(sfile, 'M:0;');
-    writeln(sfile, 'R:0;');
+    writeln(sfile, 'stage:1;');
+    writeln(sfile, 'hp:100;');
+    writeln(sfile, 'dmg:2;');
+    writeln(sfile, 'melee:0;');
+    writeln(sfile, 'range:0;');
     close(sfile);
 end;
 
@@ -371,12 +384,13 @@ begin
     while not EOF(sfile) do
     begin
         readln(sfile, s);
-        case s[1] of
-            'S': c.stage := SrI(ParserShorter(s));
-            'H': c.hp := SrI(ParserShorter(s));
-            'D': c.dmg := SrI(ParserShorter(s));
-            'M': loadMelee(itm, c, SrI(ParserShorter(s)));
-            'R': loadRange(itm, c, SrI(ParserShorter(s)));
+        case ParseHeader(s) of
+            'stage': c.stage := SrI(ParseBody(s));
+            'hp': c.hp := SrI(ParseBody(s));
+            'money': c.money := SrI(ParseBody(s));
+            'dmg': c.dmg := SrI(ParseBody(s));
+            'melee': loadGun(itm, c, SrI(ParseBody(s)));
+            'range': loadGun(itm, c, SrI(ParseBody(s)));
         end;
     end;
     close(sfile);
@@ -393,7 +407,14 @@ procedure init(
 begin
     parseMap(m, flr, c, f);
     parseItems(itm);
+    write('ok');
     parseSave(itm, c);
+    flr.s.heal := c.stage * 5;
+    if flr.s.heal > 100 then
+        flr.s.heal := 100;
+    flr.s.gun := random(itm^.idx)+1;
+    flr.s.healcost := c.stage * 10;
+    flr.s.guncost := (c.stage + getItemByIdx(itm, flr.s.gun).dmg) * 10;
     TextColor(yellow);
     randomize;
 end;
@@ -402,6 +423,20 @@ end;
 { FOV }
 function whatXY(flr: floor; x, y: integer): char;
 begin
+    if (x = flr.s.x) and (y = flr.s.y) then
+    begin
+        whatXY := '$';
+        exit;
+    end;
+    while flr.d <> nil do
+    begin
+        if (x = flr.d^.x) and (y = flr.d^.y) then
+        begin
+            whatXY := '+';
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
     while flr.p <> nil do
     begin
         if (x = flr.p^.x) and (y = flr.p^.y) then
@@ -419,15 +454,6 @@ begin
             exit;
         end;
         flr.g := flr.g^.next;
-    end;
-    while flr.d <> nil do
-    begin
-        if (x = flr.d^.x) and (y = flr.d^.y) then
-        begin
-            whatXY := '+';
-            exit;
-        end;
-        flr.d := flr.d^.next;
     end;
     whatXY := #0;
 end;
@@ -640,7 +666,7 @@ begin
     end;
 end;
 
-procedure showBuilding(flr: floor; c: character; f: pfreak);
+procedure showBuilding(flr: floor; c: character; f: pfreak); { todo function for search what inside building }
 var
     x, y: integer;
     ch: char;
@@ -653,6 +679,11 @@ begin
         begin
             GotoXY(x, y);
             write('.');
+            if (x = flr.s.x) and (y = flr.s.y) then
+            begin
+                GotoXY(x, y);
+                write('$');
+            end;
             if isFreak(f, x, y, ch) then
             begin
                 GotoXY(x, y);
@@ -665,6 +696,11 @@ begin
         begin
             GotoXY(x, y);
             write('.');
+            if (x = flr.s.x) and (y = flr.s.y) then
+            begin
+                GotoXY(x, y);
+                write('$');
+            end;
             if isFreak(f, x, y, ch) then
             begin
                 GotoXY(x, y);
@@ -682,6 +718,11 @@ begin
         begin
             GotoXY(x, y);
             write('.');
+            if (x = flr.s.x) and (y = flr.s.y) then
+            begin
+                GotoXY(x, y);
+                write('$');
+            end;
             if isFreak(f, x, y, ch) then
             begin
                 GotoXY(x, y);
@@ -694,6 +735,11 @@ begin
         begin
             GotoXY(x, y);
             write('.');
+            if (x = flr.s.x) and (y = flr.s.y) then
+            begin
+                GotoXY(x, y);
+                write('$');
+            end;
             if isFreak(f, x, y, ch) then
             begin
                 GotoXY(x, y);
@@ -703,6 +749,7 @@ begin
         end;
         y += 1;
     end;
+    
     GotoXY(c.x, c.y);
     write(c.s);
 end;
@@ -764,6 +811,68 @@ begin
         hideBuilding(flr);
 end;
 { /FOV }
+
+{ Shop }
+procedure shopInterface(flr: floor; itm: pitem);
+var
+    x, y: integer;
+begin
+    x := (ScreenWidth - 23) div 3;
+    y := ScreenHeight - 2;
+    GotoXY(x, y);
+    write('1) ', flr.s.heal, ' Heal: ', flr.s.healcost);
+    GotoXY(x, y+1);
+    write('2) ', getItemByIdx(itm, flr.s.gun).name, ': ', flr.s.guncost); 
+end;
+
+procedure shopMenu(flr: floor; itm: pitem; var c: character);
+var
+    ch: char;
+    success: boolean;
+begin
+    success := false;
+    shopInterface(flr, itm);
+    ch := ReadKey;
+    clearHappen();
+    case ch of
+        '1':
+        begin
+            if flr.s.healcost <= c.money then
+            begin
+                c.hp += flr.s.heal;
+                if c.hp > 100 then
+                    c.hp := 100;
+                c.money -= flr.s.healcost;
+                success := true;
+            end;
+        end;
+        '2':
+        begin
+            if flr.s.guncost <= c.money then
+            begin
+                loadGun(itm, c, flr.s.gun);
+                c.money -= flr.s.guncost;
+                success := true;
+            end;
+        end;
+        else
+            exit;
+    end;
+    if success then
+    begin
+        GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+        write('Success');
+        delay(1000);
+    end
+    else
+    begin
+        GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+        write('You haven`t enough money');
+        delay(2000);
+    end;
+    clearHappen();
+end;
+{ /Shop }
 
 { Messages }
 procedure hitMsgC(dmg: integer; mr, nc: char);
@@ -985,49 +1094,60 @@ end;
 { /Freak } 
 
 { Character }
-function canIMove(flr: floor; c: character; f: pfreak; ch: char): boolean;
+function canIMove(flr: floor; itm: pitem; var c: character;
+                                                f: pfreak; ch: char): boolean;
+var
+    x, y: integer;
 begin
+    x := c.x;
+    y := c.y;
     case ch of      { count x, y }
-        'w', 'W': c.y -= 1;
-        'a', 'A': c.x -= 1;
-        's', 'S': c.y += 1;
-        'd', 'D': c.x += 1;
+        'w', 'W': y -= 1;
+        'a', 'A': x -= 1;
+        's', 'S': y += 1;
+        'd', 'D': x += 1;
     end;
-    while f <> nil do          { Check freaks }
+    if (x = flr.s.x) and (y = flr.s.y) then    { Shop }
     begin
-        if (c.x = f^.x) and (c.y = f^.y) then
+        canIMove := false;
+        shopMenu(flr, itm,c);
+        exit;
+    end;
+    while f <> nil do          { Freaks }
+    begin
+        if (x = f^.x) and (y = f^.y) then
         begin
-            CanIMove := false;
+            canIMove := false;
             exit;
         end;
         f := f^.next;
     end;
-    while flr.p <> nil do       { Check path }
+    while flr.d <> nil do       { Door }
     begin
-        if (c.x = flr.p^.x) and (c.y = flr.p^.y) then
+        if (x = flr.d^.x) and (y = flr.d^.y) then
         begin
-            CanIMove := true;
+            canIMove := true;
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
+    while flr.p <> nil do       { Path }
+    begin
+        if (x = flr.p^.x) and (y = flr.p^.y) then
+        begin
+            canIMove := true;
             exit;
         end;
         flr.p := flr.p^.next;
     end;
-    while flr.g <> nil do       { Check ground }
+    while flr.g <> nil do       { Ground }
     begin
-        if (c.x = flr.g^.x) and (c.y = flr.g^.y) then
+        if (x = flr.g^.x) and (y = flr.g^.y) then
         begin
-            CanIMove := true;
+            canIMove := true;
             exit;
         end;
         flr.g := flr.g^.next;
-    end;
-    while flr.d <> nil do       { Check door }
-    begin
-        if (c.x = flr.d^.x) and (c.y = flr.d^.y) then
-        begin
-            CanIMove := true;
-            exit;
-        end;
-        flr.d := flr.d^.next;
     end;
     canIMove := false;
 end;
@@ -1047,9 +1167,9 @@ begin
     write(loc);
 end;
 
-procedure moveC(flr: floor; var c: character; f: pfreak; ch: char);
+procedure moveC(flr: floor; itm: pitem; var c: character; f: pfreak; ch: char);
 begin
-    if not canIMove(flr, c, f, ch) then
+    if not canIMove(flr, itm, c, f, ch) then
         exit;
     hideC(flr, c);
     case ch of
@@ -1072,12 +1192,13 @@ begin
     end;
     GotoXY(5, 1);
     write('HP: ', c.hp);
+    write('  Money: ', c.money);
+    write('  Inv: ', c.melee.name);
+    write(' and ', c.range.name);
     write('   M: ', c.melee.dmg + c.dmg);
     write(' S: ', c.melee.strength);
     write('   R: ', c.range.dmg);
     write(' S: ', c.range.strength);
-    write('       Inv: ', c.melee.name);
-    write(' and ', c.range.name);
 end;
 
 procedure meleeC(itm: pitem; var c: character; var f: pfreak);
@@ -1222,7 +1343,7 @@ var
 begin
     ch := ReadKey;
     case ch of
-        'w','W','a','A','s','S','d','D': moveC(flr, c, f, ch);
+        'w','W','a','A','s','S','d','D': moveC(flr, itm, c, f, ch);
         'e', 'E': meleeC(itm, c, f);
         'q', 'Q': rangeC(flr, itm, c, f);
         #27: gameOver();

@@ -1,5 +1,6 @@
-S:1;
-H:100;
-D:2;
-M:1;
-R:3;
+stage:1;
+hp:100;
+money:100;
+dmg:2;
+melee:1;
+range:5;

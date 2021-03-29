@@ -115,7 +115,7 @@ end;
 
 function ParseHeader(src: string): string;
 begin
-    if src[1] = '*' then
+    if src[1] = '*' then    { Comments }
     begin
         ParseHeader := '';
         exit;

@@ -160,14 +160,12 @@ begin
         c.range := getItemByIdx(itm, idx);
 end;
 
-procedure unloadMelee(itm: pitem; var c: character);
+procedure unloadGun(itm: pitem; var c: character; idx: integer);
 begin
-    c.melee := getItemByIdx(itm, 0);
-end;
-
-procedure unloadRange(itm: pitem; var c: character);
-begin
-    c.range := getItemByIdx(itm, 0);
+    if idx <= 3 then
+        c.melee := getItemByIdx(itm, 0)
+    else
+        c.range := getItemByIdx(itm, 0);
 end;
 { /Items }
 
@@ -1209,7 +1207,7 @@ var
 begin
     if (c.melee.strength <= 0) and (c.melee.idx <> 0) then
     begin
-        unloadMelee(itm, c);
+        unloadGun(itm, c, c.melee.idx);
         brokenGunMsgC();
     end;
     if c.melee.strength <> 0 then
@@ -1262,7 +1260,7 @@ begin
     end;
     if (c.range.strength <= 0) and (c.range.idx <> 0) then
     begin
-        unloadRange(itm, c);
+        unloadGun(itm, c, c.range.idx);
         brokenGunMsgC();
         exit;
     end;

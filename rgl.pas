@@ -364,6 +364,7 @@ begin
     rewrite(sfile);
     writeln(sfile, 'stage:1;');
     writeln(sfile, 'hp:100;');
+    writeln(sfile, 'money:0');
     writeln(sfile, 'dmg:2;');
     writeln(sfile, 'melee:0;');
     writeln(sfile, 'range:0;');
@@ -405,7 +406,6 @@ procedure init(
 begin
     parseMap(m, flr, c, f);
     parseItems(itm);
-    write('ok');
     parseSave(itm, c);
     flr.s.heal := c.stage * 5;
     if flr.s.heal > 100 then
@@ -952,6 +952,26 @@ begin
     dispose(t);
 end;
 
+procedure combatF(flr: floor; var c: character; f: freak);
+var
+    dmg: integer;
+begin
+    if random(25) = 0 then    { chance for miss hit }
+    begin
+        hitMsgF(0, f);
+        exit;
+    end;
+
+    dmg := f.dmg - random(f.dmg div 2);   { random damage }
+    c.hp -= dmg;
+    hitMsgF(dmg, f);
+    if c.hp <= 0 then
+    begin
+        deadMsgC(f);
+        gameOver();
+    end;
+end;
+
 function canFMove(flr: floor; c: character; all: pfreak; f: freak; ch: char)
                                                                     : boolean;
 begin
@@ -960,6 +980,11 @@ begin
         'a': f.x -= 1;
         's': f.y += 1;
         'd': f.x += 1;
+    end;
+    if (f.x = flr.s.x) and (f.y = flr.s.y) then    { Shop }
+    begin
+        CanFMove := false;
+        exit;
     end;
     while all <> nil do          { Check freaks }
     begin
@@ -1051,26 +1076,6 @@ begin
         end;
 end;
 
-procedure combatF(flr: floor; var c: character; f: freak);
-var
-    dmg: integer;
-begin
-    if random(25) = 0 then    { chance for miss hit }
-    begin
-        hitMsgF(0, f);
-        exit;
-    end;
-
-    dmg := f.dmg - random(f.dmg div 2);   { random damage }
-    c.hp -= dmg;
-    hitMsgF(dmg, f);
-    if c.hp <= 0 then
-    begin
-        deadMsgC(f);
-        gameOver();
-    end;
-end;
-
 procedure actionFreak(flr: floor; var c: character; var f: pfreak);
 var
     tmpf: pfreak;
@@ -1097,113 +1102,6 @@ end;
 { /Freak } 
 
 { Character }
-function canIMove(flr: floor; itm: pitem; var c: character;
-                                                f: pfreak; ch: char): boolean;
-var
-    x, y: integer;
-begin
-    x := c.x;
-    y := c.y;
-    case ch of      { count x, y }
-        'w', 'W': y -= 1;
-        'a', 'A': x -= 1;
-        's', 'S': y += 1;
-        'd', 'D': x += 1;
-    end;
-    if (x = flr.s.x) and (y = flr.s.y) then    { Shop }
-    begin
-        canIMove := false;
-        shopMenu(flr, itm,c);
-        exit;
-    end;
-    while f <> nil do          { Freaks }
-    begin
-        if (x = f^.x) and (y = f^.y) then
-        begin
-            canIMove := false;
-            exit;
-        end;
-        f := f^.next;
-    end;
-    while flr.d <> nil do       { Door }
-    begin
-        if (x = flr.d^.x) and (y = flr.d^.y) then
-        begin
-            canIMove := true;
-            exit;
-        end;
-        flr.d := flr.d^.next;
-    end;
-    while flr.p <> nil do       { Path }
-    begin
-        if (x = flr.p^.x) and (y = flr.p^.y) then
-        begin
-            canIMove := true;
-            exit;
-        end;
-        flr.p := flr.p^.next;
-    end;
-    while flr.g <> nil do       { Ground }
-    begin
-        if (x = flr.g^.x) and (y = flr.g^.y) then
-        begin
-            canIMove := true;
-            exit;
-        end;
-        flr.g := flr.g^.next;
-    end;
-    canIMove := false;
-end;
-
-procedure showC(c: character);
-begin
-    GotoXY(c.x, c.y);
-    write(c.s);
-end;
-
-procedure hideC(flr: floor; c: character);
-var
-    loc: char;
-begin
-    loc := whatXY(flr, c.x, c.y);
-    GotoXY(c.x, c.y);
-    write(loc);
-end;
-
-procedure moveC(flr: floor; itm: pitem; var c: character; f: pfreak; ch: char);
-begin
-    if not canIMove(flr, itm, c, f, ch) then
-        exit;
-    hideC(flr, c);
-    case ch of
-        'w', 'W': c.y -= 1;
-        'a', 'A': c.x -= 1;
-        's', 'S': c.y += 1;
-        'd', 'D': c.x += 1;
-    end;
-    showC(c);
-end;
-
-procedure showParam(c: character);
-var
-    i: integer;
-begin
-    for i := 1 to ScreenWidth do
-    begin
-        GotoXY(i, 1);
-        write(' ');
-    end;
-    GotoXY(5, 1);
-    write('HP: ', c.hp);
-    write('  Money: ', c.money);
-    write('  Inv: ', c.melee.name);
-    write(' and ', c.range.name);
-    write('   M: ', c.melee.dmg + c.dmg);
-    write(' S: ', c.melee.strength);
-    write('   R: ', c.range.dmg);
-    write(' S: ', c.range.strength);
-end;
-
 procedure addMoney(var c: character; f: freak);
 var
     money: integer;
@@ -1351,6 +1249,117 @@ begin
         addMoney(c, t^);
         removeF(f, t);
     end;
+end;
+
+function canIMove(flr: floor; itm: pitem; var c: character;
+                                        var f: pfreak; ch: char): boolean;
+var
+    tf: pfreak;
+    x, y: integer;
+begin
+    x := c.x;
+    y := c.y;
+    tf := f;
+    case ch of      { count x, y }
+        'w', 'W': y -= 1;
+        'a', 'A': x -= 1;
+        's', 'S': y += 1;
+        'd', 'D': x += 1;
+    end;
+    if (x = flr.s.x) and (y = flr.s.y) then    { Shop }
+    begin
+        canIMove := false;
+        shopMenu(flr, itm, c);
+        exit;
+    end;
+    while tf <> nil do          { Freaks }
+    begin
+        if (x = tf^.x) and (y = tf^.y) then
+        begin
+            canIMove := false;
+            meleeC(itm, c, f);
+            exit;
+        end;
+        tf := tf^.next;
+    end;
+    while flr.d <> nil do       { Door }
+    begin
+        if (x = flr.d^.x) and (y = flr.d^.y) then
+        begin
+            canIMove := true;
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
+    while flr.p <> nil do       { Path }
+    begin
+        if (x = flr.p^.x) and (y = flr.p^.y) then
+        begin
+            canIMove := true;
+            exit;
+        end;
+        flr.p := flr.p^.next;
+    end;
+    while flr.g <> nil do       { Ground }
+    begin
+        if (x = flr.g^.x) and (y = flr.g^.y) then
+        begin
+            canIMove := true;
+            exit;
+        end;
+        flr.g := flr.g^.next;
+    end;
+    canIMove := false;
+end;
+
+procedure showC(c: character);
+begin
+    GotoXY(c.x, c.y);
+    write(c.s);
+end;
+
+procedure hideC(flr: floor; c: character);
+var
+    loc: char;
+begin
+    loc := whatXY(flr, c.x, c.y);
+    GotoXY(c.x, c.y);
+    write(loc);
+end;
+
+procedure moveC(flr: floor; itm: pitem; var c: character;
+                                                 var f: pfreak; ch: char);
+begin
+    if not canIMove(flr, itm, c, f, ch) then
+        exit;
+    hideC(flr, c);
+    case ch of
+        'w', 'W': c.y -= 1;
+        'a', 'A': c.x -= 1;
+        's', 'S': c.y += 1;
+        'd', 'D': c.x += 1;
+    end;
+    showC(c);
+end;
+
+procedure showParam(c: character);
+var
+    i: integer;
+begin
+    for i := 1 to ScreenWidth do
+    begin
+        GotoXY(i, 1);
+        write(' ');
+    end;
+    GotoXY(5, 1);
+    write('HP: ', c.hp);
+    write('  Money: ', c.money);
+    write('  Inv: ', c.melee.name);
+    write(' and ', c.range.name);
+    write('   M: ', c.melee.dmg + c.dmg);
+    write(' S: ', c.melee.strength);
+    write('   R: ', c.range.dmg);
+    write(' S: ', c.range.strength);
 end;
 
 procedure handleKey(flr: floor; itm: pitem; var c: character; var f: pfreak);

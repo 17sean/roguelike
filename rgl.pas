@@ -54,6 +54,17 @@ type
         healcost, guncost: integer;
     end;
 
+    pnpcSay = ^npcSay;
+    npcSay = record
+        data: string;
+        next: pnpcSay;
+    end;
+    npc = record
+        x, y: integer;
+        s: char;
+        say: pnpcSay;
+    end;
+
     floor = record
         p: ppath;
         g: pground;
@@ -61,6 +72,7 @@ type
         w: pwall;
         b: pbuilding;
         s: shop;
+        n: npc;
     end;
 
     character = record
@@ -270,6 +282,12 @@ begin
                     flr.s.x := x;
                     flr.s.y := y;
                 end;
+                'n':
+                begin
+                    last^.data[x] := ' ';
+                    flr.n.x := x;
+                    flr.n.y := y;
+                end;
                 '@':
                 begin
                     c.x := x;
@@ -333,6 +351,9 @@ var
     titm: pitem;
     s: string;
 begin
+    if not DFE('items.txt') then
+        halt(1);
+
     assign(ifile, 'items.txt');
     reset(ifile);
     itm := nil;
@@ -378,6 +399,7 @@ var
 begin
     if not DFE('save.txt') then
         createSave();
+
     assign(sfile, 'save.txt');
     reset(sfile);
     while not EOF(sfile) do
@@ -394,6 +416,39 @@ begin
     end;
     close(sfile);
 end;
+
+procedure parseNpc(var flr: floor);
+var
+    nfile: text;
+    s: string;
+    first, last: pnpcSay;
+begin
+    if not DFE('npc.txt') then
+        exit;
+
+    first := nil;
+    assign(nfile, 'npc.txt');
+    reset(nfile);
+    readln(nfile, s);
+    flr.n.s := s[1];
+    while not EOF(nfile) do
+    begin
+        if first = nil then
+        begin
+            new(first);
+            last := first;
+        end
+        else
+        begin
+            new(last^.next);
+            last := last^.next;
+        end;
+        readln(nfile, s);
+        last^.data := s;
+    end;
+    close(nfile);
+    flr.n.say := first;
+end;
 { /Parsers }
 
 { Init }
@@ -407,12 +462,13 @@ begin
     parseMap(m, flr, c, f);
     parseItems(itm);
     parseSave(itm, c);
+    parseNpc(flr);
     flr.s.heal := c.stage * 5;
     if flr.s.heal > 100 then
         flr.s.heal := 100;
     flr.s.gun := random(itm^.idx)+1;
-    flr.s.healcost := c.stage * 10;
-    flr.s.guncost := (c.stage + getItemByIdx(itm, flr.s.gun).dmg) * 10;
+    flr.s.healcost := flr.s.heal * 2;
+    flr.s.guncost := getItemByIdx(itm, flr.s.gun).dmg * 10;
     TextColor(yellow);
     randomize;
 end;
@@ -682,6 +738,11 @@ begin
                 GotoXY(x, y);
                 write('$');
             end;
+            if (x = flr.n.x) and (y = flr.n.y) then
+            begin
+                GotoXY(x, y);
+                write(flr.n.s);
+            end;
             if isFreak(f, x, y, ch) then
             begin
                 GotoXY(x, y);
@@ -698,6 +759,11 @@ begin
             begin
                 GotoXY(x, y);
                 write('$');
+            end;
+            if (x = flr.n.x) and (y = flr.n.y) then
+            begin
+                GotoXY(x, y);
+                write(flr.n.s);
             end;
             if isFreak(f, x, y, ch) then
             begin
@@ -721,6 +787,11 @@ begin
                 GotoXY(x, y);
                 write('$');
             end;
+            if (x = flr.n.x) and (y = flr.n.y) then
+            begin
+                GotoXY(x, y);
+                write(flr.n.s);
+            end;
             if isFreak(f, x, y, ch) then
             begin
                 GotoXY(x, y);
@@ -737,6 +808,11 @@ begin
             begin
                 GotoXY(x, y);
                 write('$');
+            end;
+            if (x = flr.n.x) and (y = flr.n.y) then
+            begin
+                GotoXY(x, y);
+                write(flr.n.s);
             end;
             if isFreak(f, x, y, ch) then
             begin
@@ -871,6 +947,34 @@ begin
 end;
 { /Shop }
 
+{ NPC }
+procedure npcTalk(flr: floor);
+var
+    i, len: integer;
+begin
+    while flr.n.say <> nil do
+    begin
+        clearHappen();
+        if KeyPressed then
+            exit;
+        len := length(flr.n.say^.data);
+        GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 2);
+        for i := 1 to len do
+        begin
+            write(flr.n.say^.data[i]);
+            delay(150);
+        end;
+        delay(500);
+        for i := len downto 1 do
+        begin
+            write(' '#8#8);
+            delay(50);
+        end;
+        flr.n.say := flr.n.say^.next;
+    end;
+end;
+{ /NPC }
+
 { Messages }
 procedure hitMsgC(dmg: integer; mr, nc: char);
 begin
@@ -976,6 +1080,11 @@ begin
         'd': f.x += 1;
     end;
     if (f.x = flr.s.x) and (f.y = flr.s.y) then    { Shop }
+    begin
+        CanFMove := false;
+        exit;
+    end;
+    if (f.x = flr.n.x) and (f.y = flr.n.y) then    { NPC }
     begin
         CanFMove := false;
         exit;
@@ -1264,6 +1373,12 @@ begin
     begin
         canIMove := false;
         shopMenu(flr, itm, c);
+        exit;
+    end;
+    if (x = flr.n.x) and (y = flr.n.y) then
+    begin
+        canIMove := false;
+        npcTalk(flr);
         exit;
     end;
     while tf <> nil do          { Freaks }

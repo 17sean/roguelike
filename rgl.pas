@@ -421,11 +421,6 @@ end;
 { FOV }
 function whatXY(flr: floor; x, y: integer): char;
 begin
-    if (x = flr.s.x) and (y = flr.s.y) then
-    begin
-        whatXY := '$';
-        exit;
-    end;
     while flr.d <> nil do
     begin
         if (x = flr.d^.x) and (y = flr.d^.y) then
@@ -752,7 +747,6 @@ begin
         end;
         y += 1;
     end;
-    
     GotoXY(c.x, c.y);
     write(c.s);
 end;
@@ -995,6 +989,15 @@ begin
         end;
         all := all^.next;
     end;
+    while flr.d <> nil do       { Check door }
+    begin
+        if (f.x = flr.d^.x) and (f.y = flr.d^.y) then
+        begin
+            CanFMove := true;
+            exit;
+        end;
+        flr.d := flr.d^.next;
+    end;
     while flr.p <> nil do       { Check path }
     begin
         if (f.x = flr.p^.x) and (f.y = flr.p^.y) then
@@ -1012,15 +1015,6 @@ begin
             exit;
         end;
         flr.g := flr.g^.next;
-    end;
-    while flr.d <> nil do       { Check door }
-    begin
-        if (f.x = flr.d^.x) and (f.y = flr.d^.y) then
-        begin
-            CanFMove := true;
-            exit;
-        end;
-        flr.d := flr.d^.next;
     end;
     canFMove := false;
 end;

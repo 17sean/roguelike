@@ -512,31 +512,6 @@ begin
     isPath := false;
 end;
 
-procedure showPath(flr: floor; c: character; f: pfreak);
-var
-    ch: char;
-    i, j, x, y: integer;
-begin
-    x := c.x - 1;
-    y := c.y - 1;
-    for i := 0 to 2 do
-        for j := 0 to 2 do
-            if isPath(flr, x + j, y + i) then
-            begin
-                GotoXY(x + j, y + i);
-                write('#');
-            end;
-    for i := 0 to 2 do
-        for j := 0 to 2 do
-            if isFreak(f, x + j, y + i, ch) then
-            begin
-                GotoXY(x + j, y + i);
-                write(ch);
-            end;
-    GotoXY(c.x, c.y);
-    write(c.s);
-end;
-
 function isGround(flr: floor; x, y: integer): boolean;
 begin
     while flr.g <> nil do
@@ -586,6 +561,36 @@ begin
         flr.d := flr.d^.next;
     end;
     isWall := false
+end;
+
+procedure showPath(flr: floor; c: character; f: pfreak);
+var
+    ch: char;
+    i, j, x, y: integer;
+begin
+    x := c.x - 1;
+    y := c.y - 1;
+    for i := 0 to 2 do
+        for j := 0 to 2 do
+        begin
+            if isPath(flr, x + j, y + i) then
+            begin
+                GotoXY(x + j, y + i);
+                write('#');
+            end;
+            if isDoor(flr, x + j, y + i) then
+            begin
+                GotoXY(x + j, y + i);
+                write('+');
+            end;
+            if isFreak(f, x + j, y + i, ch) then
+            begin
+                GotoXY(x + j, y + i);
+                write(ch);
+            end;
+        end;
+    GotoXY(c.x, c.y);
+    write(c.s);
 end;
 
 function isBuilding(flr: floor; x, y: integer): boolean;
@@ -664,7 +669,7 @@ begin
     end;
 end;
 
-procedure showBuilding(flr: floor; c: character; f: pfreak); { todo function for search what inside building }
+procedure showBuilding(flr: floor; c: character; f: pfreak);
 var
     x, y: integer;
     ch: char;
@@ -927,10 +932,10 @@ begin
     delay(1000);
 end;
 
-procedure deadMsgF(t: pfreak);
+procedure deadMsgF(f: freak);
 begin
     GotoXY((ScreenWidth - 23) div 3, ScreenHeight - 1);
-    write(t^.class, ' is dead');
+    write(f.class, ' is dead');
     delay(1000);
 end;
 { /Messages }
@@ -1199,6 +1204,17 @@ begin
     write(' S: ', c.range.strength);
 end;
 
+procedure addMoney(var c: character; f: freak);
+var
+    money: integer;
+begin
+    case f.class of
+        Demented: money := 2;
+        Hunter: money := 5;
+    end;
+    c.money += money;
+end;
+
 procedure meleeC(itm: pitem; var c: character; var f: pfreak);
 var
     t, tmp: pfreak;     { target freak } 
@@ -1242,7 +1258,8 @@ begin
     hitMsgC(dmg, 'm', nc);
     if t^.hp <= 0 then
     begin
-        deadMsgF(t);
+        deadMsgF(t^);
+        addMoney(c, t^);
         removeF(f, t);
     end;
 end;
@@ -1330,7 +1347,8 @@ begin
     hitMsgC(dmg, 'r', nc);
     if t^.hp <= 0 then
     begin
-        deadMsgF(t);
+        deadMsgF(t^);
+        addMoney(c, t^);
         removeF(f, t);
     end;
 end;

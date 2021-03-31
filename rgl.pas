@@ -459,6 +459,8 @@ procedure init(
                var c: character;
                var f: pfreak);
 begin
+    randomize;
+    TextColor(yellow);
     parseMap(m, flr, c, f);
     parseItems(itm);
     parseSave(itm, c);
@@ -468,9 +470,7 @@ begin
         flr.s.heal := 100;
     flr.s.gun := random(itm^.idx)+1;
     flr.s.healcost := flr.s.heal * 2;
-    flr.s.guncost := getItemByIdx(itm, flr.s.gun).dmg * 10;
-    TextColor(yellow);
-    randomize;
+    flr.s.guncost := getItemByIdx(itm, flr.s.gun).dmg * 3;
 end;
 { /Init }
 
@@ -885,6 +885,10 @@ begin
 end;
 { /FOV }
 
+{ Loot }
+
+{ /Loot }
+
 { Shop }
 procedure shopInterface(flr: floor; itm: pitem);
 var
@@ -1226,6 +1230,7 @@ begin
     begin
         unloadGun(itm, c, c.melee.idx);
         brokenGunMsgC();
+        clearHappen();
     end;
     if c.melee.strength <> 0 then
         c.melee.strength -= 1;

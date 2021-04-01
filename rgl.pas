@@ -47,6 +47,13 @@ type
         next: ^item;
     end;
 
+    ploot = ^loot;
+    loot = record
+        data: item;
+        x, y: integer;
+        next: ploot;
+    end;
+
     shop = record
         x, y: integer;
         heal: integer;
@@ -71,6 +78,7 @@ type
         d: pdoor;
         w: pwall;
         b: pbuilding;
+        l: ploot;
         s: shop;
         n: npc;
     end;
@@ -195,6 +203,7 @@ var
     d, td: pdoor;
     w, tw: pwall;
     b, tb: pbuilding;
+    l, tl: ploot;
     tf: pfreak;
     x, y: integer;
 begin
@@ -208,6 +217,7 @@ begin
     d := nil;
     w := nil;
     b := nil;
+    l := nil;
     f := nil;
     assign(mfile, 'map.txt');
     reset(mfile);
@@ -270,6 +280,20 @@ begin
                     tb^.x := x;
                     tb^.y := y;
                     b := tb;
+                    new(tg);
+                    tg^.next := g;
+                    tg^.x := x;
+                    tg^.y := y;
+                    g := tg;
+                end;
+                '?':
+                begin
+                    last^.data[x] := ' ';
+                    new(tl);
+                    tl^.next := l;
+                    tl^.x := x;
+                    tl^.y := y;
+                    l := tl;
                     new(tg);
                     tg^.next := g;
                     tg^.x := x;
@@ -343,6 +367,7 @@ begin
     flr.d := d;
     flr.w := w;
     flr.b := b;
+    flr.l := l;
 end;
 
 procedure parseItems(var itm: pitem);
@@ -458,6 +483,8 @@ procedure init(
                var itm: pitem;
                var c: character;
                var f: pfreak);
+var
+    tl: ploot;
 begin
     randomize;
     TextColor(yellow);
@@ -465,6 +492,13 @@ begin
     parseItems(itm);
     parseSave(itm, c);
     parseNpc(flr);
+    tl := flr.l;
+    while tl <> nil do
+    begin
+        tl^.data := getItemByIdx(itm, random(itm^.idx)+1);
+        tl^.data.strength := random(tl^.data.strength)+1;
+        tl := tl^.next;
+    end;
     flr.s.heal := c.stage * 5;
     if flr.s.heal > 100 then
         flr.s.heal := 100;
@@ -644,6 +678,20 @@ begin
     write(c.s);
 end;
 
+function isLoot(flr: floor; x, y: integer; var l: ploot): boolean;
+begin
+    while flr.l <> nil do
+    begin
+        if (x = flr.l^.x) and (y = flr.l^.y) then
+        begin
+            l := flr.l;
+            isLoot := true;
+            exit;
+        end;
+        flr.l := flr.l^.next;
+    end;
+end;
+
 function isBuilding(flr: floor; x, y: integer): boolean;
 begin
     while flr.b <> nil do
@@ -724,6 +772,7 @@ procedure showBuilding(flr: floor; c: character; f: pfreak);
 var
     x, y: integer;
     ch: char;
+    l: ploot;
 begin
     y := c.y;
     while not isWall(flr, c.x, y) do     { top }
@@ -742,6 +791,11 @@ begin
             begin
                 GotoXY(x, y);
                 write(flr.n.s);
+            end;
+            if isLoot(flr, x, y, l) then
+            begin
+                GotoXY(x, y);
+                write('?');
             end;
             if isFreak(f, x, y, ch) then
             begin
@@ -764,6 +818,11 @@ begin
             begin
                 GotoXY(x, y);
                 write(flr.n.s);
+            end;
+            if isLoot(flr, x, y, l) then
+            begin
+                GotoXY(x, y);
+                write('?');
             end;
             if isFreak(f, x, y, ch) then
             begin
@@ -792,6 +851,11 @@ begin
                 GotoXY(x, y);
                 write(flr.n.s);
             end;
+            if isLoot(flr, x, y, l) then
+            begin
+                GotoXY(x, y);
+                write('?');
+            end;
             if isFreak(f, x, y, ch) then
             begin
                 GotoXY(x, y);
@@ -813,6 +877,11 @@ begin
             begin
                 GotoXY(x, y);
                 write(flr.n.s);
+            end;
+            if isLoot(flr, x, y, l) then
+            begin
+                GotoXY(x, y);
+                write('?');
             end;
             if isFreak(f, x, y, ch) then
             begin
@@ -886,7 +955,44 @@ end;
 { /FOV }
 
 { Loot }
+procedure removeL(var flr: floor; var t: ploot);
+var
+    pp: ^ploot;
+begin
+    pp := @flr.l;
+    while pp^ <> t do
+        pp := @(pp^^.next);
+    pp^ := pp^^.next;
+    dispose(t);
+end;
 
+procedure lootInterface(l: loot);
+var
+    x, y: integer;
+begin
+    x := (ScreenWidth - 23) div 3;
+    y := ScreenHeight - 2;
+    GotoXY(x, y);
+    write(l.data.name, ' with ', l.data.strength, ' strength');
+    GotoXY(x, y+1);
+    write('F) Take it'); 
+end;
+
+procedure lootMenu(var flr: floor; var t: ploot; var c: character);
+var
+    ch: char;
+begin
+    lootInterface(t^);
+    ch := ReadKey;
+    clearHappen();
+    if not (ch in ['f', 'F']) then
+        exit;
+    if t^.data.idx <= 3 then
+        c.melee := t^.data
+    else
+        c.range := t^.data;
+    removeL(flr, t);
+end;
 { /Loot }
 
 { Shop }
@@ -1359,15 +1465,16 @@ begin
     end;
 end;
 
-function canIMove(flr: floor; itm: pitem; var c: character;
+function canIMove(var flr: floor; itm: pitem; var c: character;
                                         var f: pfreak; ch: char): boolean;
 var
-    tf: pfreak;
+    tl: ploot;
+    tmpf, tf: pfreak;
     x, y: integer;
 begin
     x := c.x;
     y := c.y;
-    tf := f;
+    tmpf := f;
     case ch of      { count x, y }
         'w', 'W': y -= 1;
         'a', 'A': x -= 1;
@@ -1380,48 +1487,38 @@ begin
         shopMenu(flr, itm, c);
         exit;
     end;
-    if (x = flr.n.x) and (y = flr.n.y) then
+    if (x = flr.n.x) and (y = flr.n.y) then    { Npc }
     begin
         canIMove := false;
         npcTalk(flr);
         exit;
     end;
-    while tf <> nil do          { Freaks }
+    if isLoot(flr, x, y, tl) then { Loot }
     begin
-        if (x = tf^.x) and (y = tf^.y) then
-        begin
-            canIMove := false;
-            meleeC(itm, c, f);
-            exit;
-        end;
-        tf := tf^.next;
+        CanIMove := false;
+        lootMenu(flr, tl, c);
+        exit;
     end;
-    while flr.d <> nil do       { Door }
+    if findFreak(tmpf, x, y, tf) then  { Freak }
     begin
-        if (x = flr.d^.x) and (y = flr.d^.y) then
-        begin
-            canIMove := true;
-            exit;
-        end;
-        flr.d := flr.d^.next;
+        CanIMove := false;
+        meleeC(itm, c, tf);
+        exit
     end;
-    while flr.p <> nil do       { Path }
+    if isDoor(flr, x, y) then   { Door }
     begin
-        if (x = flr.p^.x) and (y = flr.p^.y) then
-        begin
-            canIMove := true;
-            exit;
-        end;
-        flr.p := flr.p^.next;
+        CanIMove := true;
+        exit;
     end;
-    while flr.g <> nil do       { Ground }
+    if isPath(flr, x, y) then   { Path }
     begin
-        if (x = flr.g^.x) and (y = flr.g^.y) then
-        begin
-            canIMove := true;
-            exit;
-        end;
-        flr.g := flr.g^.next;
+        CanIMove := true;
+        exit;
+    end;
+    if isGround(flr, x, y) then { Ground } 
+    begin
+        canIMove := true;
+        exit;
     end;
     canIMove := false;
 end;
@@ -1441,7 +1538,7 @@ begin
     write(loc);
 end;
 
-procedure moveC(flr: floor; itm: pitem; var c: character;
+procedure moveC(var flr: floor; itm: pitem; var c: character;
                                                  var f: pfreak; ch: char);
 begin
     if not canIMove(flr, itm, c, f, ch) then
@@ -1476,7 +1573,8 @@ begin
     write(' S: ', c.range.strength);
 end;
 
-procedure handleKey(flr: floor; itm: pitem; var c: character; var f: pfreak);
+procedure handleKey(var flr: floor; itm: pitem; var c: character;
+                                                             var f: pfreak);
 var
     ch: char;
 begin

@@ -980,7 +980,17 @@ begin
     clearHappen();
     if not (ch in ['f', 'F']) then
         exit;
-    if t^.data.idx <= 3 then
+    { If already have }
+    if (t^.data.idx = c.melee.idx) or (t^.data.idx = c.range.idx) then
+    begin
+        if t^.data.idx <= 3 then
+            c.melee.strength += t^.data.strength
+        else
+            c.range.strength += t^.data.strength;
+        removeL(flr, t);
+        exit;
+    end
+    else if t^.data.idx <= 3 then   { If new }
         c.melee := t^.data
     else
         c.range := t^.data;

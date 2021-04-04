@@ -509,38 +509,6 @@ end;
 { /Init }
 
 { FOV }
-function whatXY(flr: floor; x, y: integer): char;
-begin
-    while flr.d <> nil do
-    begin
-        if (x = flr.d^.x) and (y = flr.d^.y) then
-        begin
-            whatXY := '+';
-            exit;
-        end;
-        flr.d := flr.d^.next;
-    end;
-    while flr.p <> nil do
-    begin
-        if (x = flr.p^.x) and (y = flr.p^.y) then
-        begin
-            whatXY := '#';
-            exit;
-        end;
-        flr.p := flr.p^.next;
-    end;
-    while flr.g <> nil do
-    begin
-        if (x = flr.g^.x) and (y = flr.g^.y) then
-        begin
-            whatXY := '.';
-            exit;
-        end;
-        flr.g := flr.g^.next;
-    end;
-    whatXY := #0;
-end;
-
 function isCharacter(c: character; x, y: integer): boolean;
 begin
     if (x = c.x) and (y = c.y) then
@@ -576,8 +544,8 @@ begin
         end;
         f := f^.next;
     end;
-    findFreak := false;
     res := nil;
+    findFreak := false;
 end;
 
 function isPath(flr: floor; x, y: integer): boolean;
@@ -683,6 +651,50 @@ begin
         end;
         flr.l := flr.l^.next;
     end;
+    isLoot := false;
+end;
+
+function whatXY(flr: floor; f: pfreak; x, y: integer): char;
+var
+    l: ploot;
+    ch: char;
+begin
+    if (x = flr.s.x) and (y = flr.s.y) then
+    begin
+        whatXY := '$';
+        exit;
+    end;
+    if (x = flr.n.x) and (y = flr.n.y) then
+    begin
+        whatXY := flr.n.s;
+        exit;
+    end;
+    if isFreak(f, x, y, ch) then
+    begin
+        whatXY := ch;
+        exit;
+    end;
+    if isLoot(flr, x, y, l) then
+    begin
+        whatXY := '?';
+        exit;
+    end;
+    if isDoor(flr, x, y) then
+    begin
+        whatXY := '+';
+        exit;
+    end;
+    if isPath(flr, x, y) then
+    begin
+        whatXY := '#';
+        exit;
+    end;
+    if isGround(flr, x, y) then
+    begin
+        whatXY := '.';
+        exit;
+    end;
+    whatXY := #0;
 end;
 
 function isBuilding(flr: floor; x, y: integer): boolean;
@@ -764,8 +776,6 @@ end;
 procedure showBuilding(flr: floor; c: character; f: pfreak);
 var
     x, y: integer;
-    ch: char;
-    l: ploot;
 begin
     y := c.y;
     while not isWall(flr, c.x, y) do     { top }
@@ -774,54 +784,14 @@ begin
         while not isWall(flr, x, y) do         { left }
         begin
             GotoXY(x, y);
-            write('.');
-            if (x = flr.s.x) and (y = flr.s.y) then
-            begin
-                GotoXY(x, y);
-                write('$');
-            end;
-            if (x = flr.n.x) and (y = flr.n.y) then
-            begin
-                GotoXY(x, y);
-                write(flr.n.s);
-            end;
-            if isLoot(flr, x, y, l) then
-            begin
-                GotoXY(x, y);
-                write('?');
-            end;
-            if isFreak(f, x, y, ch) then
-            begin
-                GotoXY(x, y);
-                write(ch);
-            end;
+            write(whatXY(flr, f, x, y));
             x -= 1;
         end; 
         x := c.x + 1;
         while not isWall(flr, x, y) do         { right }
         begin
             GotoXY(x, y);
-            write('.');
-            if (x = flr.s.x) and (y = flr.s.y) then
-            begin
-                GotoXY(x, y);
-                write('$');
-            end;
-            if (x = flr.n.x) and (y = flr.n.y) then
-            begin
-                GotoXY(x, y);
-                write(flr.n.s);
-            end;
-            if isLoot(flr, x, y, l) then
-            begin
-                GotoXY(x, y);
-                write('?');
-            end;
-            if isFreak(f, x, y, ch) then
-            begin
-                GotoXY(x, y);
-                write(ch);
-            end;
+            write(whatXY(flr, f, x, y));
             x += 1;
         end;
         y -= 1;
@@ -833,54 +803,14 @@ begin
         while not isWall(flr, x, y) do          { left }
         begin
             GotoXY(x, y);
-            write('.');
-            if (x = flr.s.x) and (y = flr.s.y) then
-            begin
-                GotoXY(x, y);
-                write('$');
-            end;
-            if (x = flr.n.x) and (y = flr.n.y) then
-            begin
-                GotoXY(x, y);
-                write(flr.n.s);
-            end;
-            if isLoot(flr, x, y, l) then
-            begin
-                GotoXY(x, y);
-                write('?');
-            end;
-            if isFreak(f, x, y, ch) then
-            begin
-                GotoXY(x, y);
-                write(ch);
-            end;
+            write(whatXY(flr, f, x, y));
             x -= 1;
         end; 
         x := c.x + 1;
         while not isWall(flr, x, y) do          { right }
         begin
             GotoXY(x, y);
-            write('.');
-            if (x = flr.s.x) and (y = flr.s.y) then
-            begin
-                GotoXY(x, y);
-                write('$');
-            end;
-            if (x = flr.n.x) and (y = flr.n.y) then
-            begin
-                GotoXY(x, y);
-                write(flr.n.s);
-            end;
-            if isLoot(flr, x, y, l) then
-            begin
-                GotoXY(x, y);
-                write('?');
-            end;
-            if isFreak(f, x, y, ch) then
-            begin
-                GotoXY(x, y);
-                write(ch);
-            end;
+            write(whatXY(flr, f, x, y));
             x += 1;
         end;
         y += 1;
@@ -1532,11 +1462,11 @@ begin
     write(c.s);
 end;
 
-procedure hideC(flr: floor; c: character);
+procedure hideC(flr: floor; c: character; f: pfreak);
 var
     loc: char;
 begin
-    loc := whatXY(flr, c.x, c.y);
+    loc := whatXY(flr, f, c.x, c.y);
     GotoXY(c.x, c.y);
     write(loc);
 end;
@@ -1546,7 +1476,7 @@ procedure moveC(var flr: floor; itm: pitem; var c: character;
 begin
     if not canIMove(flr, itm, c, f, ch) then
         exit;
-    hideC(flr, c);
+    hideC(flr, c, f);
     case ch of
         'w', 'W': c.y -= 1;
         'a', 'A': c.x -= 1;

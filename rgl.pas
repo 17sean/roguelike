@@ -564,20 +564,17 @@ begin
     isFreak := false;
 end;
 
-function findFreak(var f: pfreak; x, y: integer; var res: pfreak): boolean;
-var
-    tmp: pfreak;
+function findFreak(f: pfreak; x, y: integer; var res: pfreak): boolean;
 begin
-    tmp := f;
-    while tmp <> nil do
+    while f <> nil do
     begin
-        if (x = tmp^.x) and (y = tmp^.y) then
+        if (x = f^.x) and (y = f^.y) then
         begin
             findFreak := true;
-            res := tmp;
+            res := f;
             exit;
         end;
-        tmp := tmp^.next;
+        f := f^.next;
     end;
     findFreak := false;
     res := nil;
@@ -636,16 +633,12 @@ begin
         end;
         flr.w := flr.w^.next;
     end;
-    while flr.d <> nil do
+    if isDoor(flr, x, y) then
     begin
-        if (x = flr.d^.x) and (y = flr.d^.y) then
-        begin
-            isWall := true;
-            exit;
-        end;
-        flr.d := flr.d^.next;
+        isWall := true;
+        exit;
     end;
-    isWall := false
+    isWall := false;
 end;
 
 procedure showPath(flr: floor; c: character; f: pfreak);
@@ -1075,7 +1068,7 @@ begin
             delay(150);
         end;
         delay(500);
-        for i := len downto 1 do
+        for i := len downto 1 do   { erase words }
         begin
             write(' '#8#8);
             delay(50);

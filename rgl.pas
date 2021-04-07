@@ -4,37 +4,37 @@ type
     pmap = ^map;
     map = record
         data: string;
-        next: ^map;
+        next: pmap;
     end;
 
     ppath = ^path;
     path = record
         x, y: integer;
-        next: ^path;
+        next: ppath;
     end;
 
     pground = ^ground;
     ground = record
         x, y: integer;
-        next: ^ground;
+        next: pground;
     end;
 
     pdoor = ^door;
     door = record
         x, y: integer;
-        next: ^door;
+        next: pdoor;
     end;
     
     pwall = ^wall;
     wall = record
         x, y: integer;
-        next: ^wall;
+        next: pwall;
     end;
 
     pbuilding = ^building;
     building = record
         x, y: integer;
-        next: ^building;
+        next: pbuilding;
     end;
 
     pitem = ^item;
@@ -44,7 +44,7 @@ type
         dmg: integer;
         dist: integer;
         strength: integer;
-        next: ^item;
+        next: pitem;
     end;
 
     ploot = ^loot;
@@ -101,7 +101,7 @@ type
         class: freakClass;
         hp: integer;
         dmg: integer;
-        next: ^freak;
+        next: pfreak;
     end;
 
 procedure screenCheck();
@@ -771,6 +771,7 @@ begin
         end;
         y += 1;
     end;
+    findBuilding := false;
 end;
 
 procedure showBuilding(flr: floor; c: character; f: pfreak);

@@ -1,5 +1,5 @@
 program roguelike;
-uses crt, slib;
+uses crt;
 type
     pmap = ^map;
     map = record
@@ -104,6 +104,136 @@ type
         next: pfreak;
     end;
 
+{ *** SLIB *** }
+function SrI(s: string): longint;
+var
+    i: integer;
+    res: longint;
+    negative: boolean;
+begin
+    res := 0;
+    negative := false;
+    for i := 1 to length(s) do
+    begin
+        if (i = 1) and (s[1] = '-') then
+            negative := true
+        else
+        begin
+            res *= 10;
+            res += ord(s[i]) - ord('0');
+        end;
+    end;
+    if negative then
+        res *= -1;
+    SrI := res;
+end;
+
+function IrS(i: longint): string;
+type
+    pCharEl = ^CharEl;
+    CharEl = record
+        data: char;
+        next: pCharEl;
+    end;
+var
+    p, tmp: pCharEl;
+    s: string;
+    j: longint;
+begin
+    if i = 0 then
+    begin
+        IrS := '0';
+        exit;
+    end;
+
+    p := nil;
+    s := ''; 
+    j := i;
+    if i < 0 then
+        i := -i;
+    while i <> 0 do
+    begin
+        new(tmp);
+        if (i mod 10) <> 0 then
+            tmp^.data := chr(ord(i mod 10) + ord('0'))
+        else
+            tmp^.data := '0';
+        i := i div 10;
+        tmp^.next := p;
+        p := tmp;
+    end;
+    if j < 0 then
+        s += '-';
+    while tmp <> nil do
+    begin
+        s += tmp^.data;
+        tmp := tmp^.next;
+    end;
+    while p <> nil do
+    begin
+        tmp := p;
+        p := p^.next;
+        dispose(tmp);
+    end;
+    IrS := s;
+end;
+
+function DFE(dir: string): boolean;
+var
+    f: file;
+begin
+    assign(f, dir);
+    {$I-}
+    reset(f);
+    if IOresult = 0 then
+    begin
+        DFE := true;
+        close(f);
+    end
+    else
+        DFE := false;
+    {$I+}
+end;
+
+function StringShorter(src: string; pos: integer; stop: char): string;
+var
+    dst: string;
+begin
+    dst := '';
+    while src[pos] <> stop do
+    begin
+        dst += src[pos];
+        pos += 1;
+    end;
+    StringShorter := dst;
+end;
+
+function ParseHeader(src: string): string;
+begin
+    if src[1] = '*' then    { Comments }
+    begin
+        ParseHeader := '';
+        exit;
+    end;
+    if src[1] in ['~', '#'] then
+    begin
+        ParseHeader := src[1];
+        exit;
+    end;
+    ParseHeader := StringShorter(src, 1, ':');
+end;
+
+function ParseBody(src: string): string;
+var
+    pos: integer;
+begin
+    pos := 1;
+    while src[pos] <> ':' do
+        pos += 1;
+    ParseBody := StringShorter(src, pos+1, ';');
+end;
+{ *** /SLIB ***}
+
 procedure screenCheck();
 begin
     if (ScreenHeight < 23) or (Screenwidth < 76) then
@@ -122,9 +252,9 @@ begin
     clrscr;
     GotoXY((ScreenWidth - 9) div 2, ScreenHeight div 2);
     write('Game Over');
-    delay(500);
+    delay(1000);
     clrscr;
-    halt(1);
+    halt(0);
 end;
 
 { MAP }
@@ -172,17 +302,17 @@ begin
     end;
 end;
 
-procedure loadGun(itm: pitem; var c: character; idx: integer);
+procedure loadGun(itm: pitem; var c: character; idx: integer; ch: char);
 begin
-    if idx <= 3 then
+    if ch = 'm' then
         c.melee := getItemByIdx(itm, idx)
     else
         c.range := getItemByIdx(itm, idx);
 end;
 
-procedure unloadGun(itm: pitem; var c: character; idx: integer);
+procedure unloadGun(itm: pitem; var c: character; ch: char);
 begin
-    if idx <= 3 then
+    if ch = 'm' then
         c.melee := getItemByIdx(itm, 0)
     else
         c.range := getItemByIdx(itm, 0);
@@ -435,8 +565,8 @@ begin
             'hp': c.hp := SrI(ParseBody(s));
             'money': c.money := SrI(ParseBody(s));
             'dmg': c.dmg := SrI(ParseBody(s));
-            'melee': loadGun(itm, c, SrI(ParseBody(s)));
-            'range': loadGun(itm, c, SrI(ParseBody(s)));
+            'melee': loadGun(itm, c, SrI(ParseBody(s)), 'm');
+            'range': loadGun(itm, c, SrI(ParseBody(s)), 'r');
         end;
     end;
     close(sfile);
@@ -920,8 +1050,8 @@ begin
             c.range.strength += t^.data.strength;
         removeL(flr, t);
         exit;
-    end
-    else if t^.data.idx <= 3 then   { If new }
+    end   { If new }
+    else if t^.data.idx <= 3 then
         c.melee := t^.data
     else
         c.range := t^.data;
@@ -967,7 +1097,10 @@ begin
         begin
             if flr.s.guncost <= c.money then
             begin
-                loadGun(itm, c, flr.s.gun);
+                if flr.s.gun <= 3 then
+                    loadGun(itm, c, flr.s.gun, 'm')
+                else
+                    loadGun(itm, c, flr.s.gun, 'r');
                 c.money -= flr.s.guncost;
                 success := true;
             end;
@@ -1006,7 +1139,7 @@ begin
         for i := 1 to len do
         begin
             write(flr.n.say^.data[i]);
-            delay(150);
+            delay(100);
         end;
         delay(500);
         for i := len downto 1 do   { erase words }
@@ -1268,7 +1401,7 @@ var
 begin
     if (c.melee.strength <= 0) and (c.melee.idx <> 0) then
     begin
-        unloadGun(itm, c, c.melee.idx);
+        unloadGun(itm, c, 'm');
         brokenGunMsgC();
         clearHappen();
     end;
@@ -1323,7 +1456,7 @@ begin
     end;
     if (c.range.strength <= 0) and (c.range.idx <> 0) then
     begin
-        unloadGun(itm, c, c.range.idx);
+        unloadGun(itm, c, 'r');
         brokenGunMsgC();
         exit;
     end;
@@ -1505,6 +1638,7 @@ begin
     write(' S: ', c.melee.strength);
     write('   R: ', c.range.dmg);
     write(' S: ', c.range.strength);
+    write(' D: ', c.range.dist);
 end;
 
 procedure handleKey(var flr: floor; itm: pitem; var c: character;

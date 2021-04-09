@@ -2,5 +2,5 @@ stage:1;
 hp:100;
 money:0;
 dmg:2;
-melee:3;
-range:6;
+melee:0;
+range:0;
